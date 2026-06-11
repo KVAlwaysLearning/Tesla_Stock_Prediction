@@ -281,26 +281,36 @@ def extract_gdrive_id(url: str) -> str | None:
 
 @st.cache_resource(show_spinner=False)
 def load_model_cached(file_id: str):
+    """Download and load the .keras model. Cached by file_id."""
     try:
         import gdown
+    except ImportError:
+        raise RuntimeError("'gdown' is not installed. Add it to requirements.txt.")
+    try:
         import tensorflow as tf
-    except ImportError as e:
-        raise RuntimeError(f"Missing mandatory framework dependency: {e}")
+    except ImportError:
+        raise RuntimeError("'tensorflow' is not installed. Add it to requirements.txt.")
 
     download_url = f"https://drive.google.com/uc?id={file_id}"
     tmp_path     = os.path.join(tempfile.gettempdir(), f"tsla_model_{file_id[:8]}.keras")
 
+    # Only re-download if file doesn't exist yet (avoids repeated downloads on re-runs)
     if not os.path.exists(tmp_path):
-        result = gdown.download(download_url, tmp_path, quiet=True, fuzzy=True)
+        # FIX: Removed the deprecated fuzzy=True argument to prevent crashes on modern gdown versions
+        result = gdown.download(download_url, tmp_path, quiet=True)
         if result is None or not os.path.exists(tmp_path):
-            raise RuntimeError("Google Drive extraction node failed. Check file view permissions.")
+            raise RuntimeError(
+                "Download returned nothing. Ensure the file is shared as "
+                "'Anyone with the link can view' and the link is correct."
+            )
 
     try:
         model = tf.keras.models.load_model(tmp_path)
     except Exception as e:
+        # Remove corrupted file so next attempt re-downloads
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise RuntimeError(f"Model format error during local load sequence: {e}")
+        raise RuntimeError(f"Model file downloaded but could not be loaded: {e}")
 
     return model
 

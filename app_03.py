@@ -1,6 +1,6 @@
 # ============================================================
 # TSLA FORECASTING HUB  |  app.py
-# Model: Hybrid CNN-GRU + Statistical Trend Alignment
+# Model: Dual-Engine Hybrid (CNN-GRU + Prophet + SARIMAX)
 # ============================================================
 
 import os
@@ -16,7 +16,6 @@ import streamlit as st
 
 warnings.filterwarnings("ignore")
 
-# Global Safe Secret Declaration Engine
 secret_url = ""
 try:
     if "model_config" in st.secrets and "gdrive_model_link" in st.secrets["model_config"]:
@@ -188,7 +187,6 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df.ffill(inplace=True)
     df.bfill(inplace=True)
 
-    # Derived technical columns
     df["Spread"]    = df["High"] - df["Low"]
     df["MA30"]      = df["Close"].rolling(30).mean()
     df["MA90"]      = df["Close"].rolling(90).mean()
@@ -200,14 +198,12 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df["MACDHist"]  = df["MACD"] - df["MACDSig"]
     df["DailyReturn"] = df["Close"].pct_change() * 100
 
-    # RSI (14)
     delta = df["Close"].diff()
     gain  = delta.clip(lower=0).rolling(14).mean()
     loss  = (-delta.clip(upper=0)).rolling(14).mean()
     rs    = gain / loss.replace(0, np.nan)
     df["RSI"] = 100 - (100 / (1 + rs))
 
-    # Bollinger Bands
     df["BB_Mid"]   = df["Close"].rolling(20).mean()
     bb_std         = df["Close"].rolling(20).std()
     df["BB_Upper"] = df["BB_Mid"] + 2 * bb_std
@@ -265,17 +261,51 @@ def load_model_cached(file_id: str):
 
     return model
 
-def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
+def compute_statistical_trends(hist_df: pd.DataFrame, target_dates: pd.DatetimeIndex) -> np.ndarray:
     """
-    Advanced Hybrid Strategy Engine.
-    Combines deep learning models with SARIMAX seasonality filters to prevent decay flatlining.
+    Dual Engine Trend Extrapolator: Fits both Prophet and SARIMAX over the historical sequence 
+    to extract seasonal delta variations and completely stop variance collapse / flatlining.
     """
-    # Defensive Runtime Import Injection to isolate failures if environment is misconfigured
     try:
+        from prophet import Prophet
         from statsmodels.tsa.statespace.sarimax import SARIMAX
     except ImportError:
-        raise RuntimeError("The 'statsmodels' library is missing from your deployment runtime. Please add statsmodels to requirements.txt")
+        raise RuntimeError("Libraries missing from runtime environment. Verify requirements.txt includes 'prophet' and 'statsmodels'")
 
+    steps = len(target_dates)
+    if steps == 0:
+        return np.zeros(0)
+
+    # 1. Run Prophet Core Layer (Captures Macro Yearly/Quarterly Waves)
+    pdf = hist_df.reset_index().rename(columns={"Date": "ds", "Adj Close": "y"})
+    # Suppress log notifications from prophet execution
+    import logging
+    logging.getLogger('prophet').setLevel(logging.ERROR)
+    
+    m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
+    m_prophet.fit(pdf)
+    
+    future_df = pd.DataFrame({"ds": target_dates})
+    forecast_prophet = m_prophet.predict(future_df)
+    prophet_trend = forecast_prophet["yhat"].values - hist_df.iloc[-1]
+
+    # 2. Run SARIMAX Core Layer (Captures Short-Term Structural Autoregressive Cycles)
+    try:
+        sarimax_model = SARIMAX(hist_df.values, order=(1,1,1), seasonal_order=(1,0,0,5))
+        sarimax_res = sarimax_model.fit(disp=False)
+        sarimax_trend = sarimax_res.forecast(steps=steps) - hist_df.iloc[-1]
+    except Exception:
+        sarimax_trend = prophet_trend
+
+    # Blended Output: Equal dynamic weights to prevent overfitting either configuration
+    return (0.50 * prophet_trend) + (0.50 * sarimax_trend)
+
+
+def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
+    """
+    Advanced Dual-Engine Hybrid Strategy Framework.
+    Combines deep learning loops with fused Prophet + SARIMAX trends.
+    """
     today_marker = pd.Timestamp.now().normalize()
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -296,12 +326,8 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         one_year_ago = june_10_marker - pd.Timedelta(days=365)
         hist_1y = df.loc[one_year_ago:june_10_marker, "Adj Close"].resample('B').ffill().dropna()
         
-        try:
-            sarimax_core = SARIMAX(hist_1y.values, order=(1,1,1), seasonal_order=(1,0,0,5))
-            sarimax_res = sarimax_core.fit(disp=False)
-            seasonality_deltas = sarimax_res.forecast(steps=n_days) - hist_1y.iloc[-1]
-        except Exception:
-            seasonality_deltas = np.zeros(n_days)
+        # Calculate dual trend corrections over the entire window
+        trend_deltas = compute_statistical_trends(hist_1y, biz_dates)
 
         for idx, curr_date in enumerate(biz_dates):
             if curr_date <= db_max_date:
@@ -322,10 +348,11 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                 pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
                 preds_prices.append(pred_val)
 
+        # Force structural transformation onto neural model values to completely break flatlining
         preds_prices = np.array(preds_prices, dtype=np.float32)
         for idx in range(len(preds_prices)):
-            if idx < len(seasonality_deltas):
-                preds_prices[idx] += float(seasonality_deltas[idx] * 0.45)
+            if idx < len(trend_deltas):
+                preds_prices[idx] += float(trend_deltas[idx] * 0.65) # Stronger 65% trend reinforcement weight
             
             band_frac = np.clip(daily_vol * np.sqrt(idx + 1), 0, 0.45)
             lower_bounds.append(preds_prices[idx] * (1 - band_frac))
@@ -336,45 +363,43 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         one_year_before_today = today_marker - pd.Timedelta(days=365)
         hist_1y = df.loc[one_year_before_today:min(today_marker, db_max_date), "Adj Close"].resample('B').ffill().dropna()
         
-        try:
-            sarimax_core = SARIMAX(hist_1y.values, order=(1,1,1), seasonal_order=(1,0,0,5))
-            sarimax_res = sarimax_core.fit(disp=False)
-            seasonality_deltas = sarimax_res.forecast(steps=n_days + 30) - hist_1y.iloc[-1]
-        except Exception:
-            seasonality_deltas = np.zeros(n_days + 30)
-
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
+        
+        # Calculate combined structural horizons for full forecast extension window
+        total_future_dates = gap_range.append(biz_dates)
+        trend_deltas = compute_statistical_trends(hist_1y, total_future_dates)
+
         history_slice = df.tail(LOOKBACK)
         scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
         
-        bridge_step = 1
+        bridge_step = 0
         for g_date in gap_range:
             x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
             out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
             pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
             scaled_seed.append(out_scaled)
             
-            if bridge_step < len(seasonality_deltas):
-                pred_val += float(seasonality_deltas[bridge_step] * 0.45)
+            if bridge_step < len(trend_deltas):
+                pred_val += float(trend_deltas[bridge_step] * 0.65)
                 
-            band_frac = np.clip(daily_vol * np.sqrt(bridge_step), 0, 0.45)
+            band_frac = np.clip(daily_vol * np.sqrt(bridge_step + 1), 0, 0.45)
             bridge_dates.append(g_date)
             bridge_prices.append(pred_val)
             bridge_lo.append(pred_val * (1 - band_frac))
             bridge_hi.append(pred_val * (1 + band_frac))
             bridge_step += 1
             
-        for step in range(1, n_days + 1):
+        for step in range(len(biz_dates)):
             x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
             out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
             pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
             scaled_seed.append(out_scaled)
             
-            s_idx = bridge_step + step
-            if s_idx < len(seasonality_deltas):
-                pred_val += float(seasonality_deltas[s_idx] * 0.45)
+            s_idx = bridge_step
+            if s_idx < len(trend_deltas):
+                pred_val += float(trend_deltas[s_idx] * 0.65)
                 
-            band_frac = np.clip(daily_vol * np.sqrt(bridge_step), 0, 0.45)
+            band_frac = np.clip(daily_vol * np.sqrt(bridge_step + 1), 0, 0.45)
             preds_prices.append(pred_val)
             lower_bounds.append(pred_val * (1 - band_frac))
             upper_bounds.append(pred_val * (1 + band_frac))
@@ -474,12 +499,13 @@ f_dates, f_prices, f_lower, f_upper = None, None, None, None
 b_dates, b_prices, b_lower, b_upper = None, None, None, None
 
 if model is not None and scaler_ok:
-    try:
-        f_dates, f_prices, f_lower, f_upper, b_dates, b_prices, b_lower, b_upper = dynamic_timeline_forecasting(
-            model, scaler, df, pd.Timestamp(chosen_start_date), n_days=forecast_days
-        )
-    except Exception as _err:
-        st.error(f"Hybrid Matrix Strategy Core fault: {_err}")
+    with st.spinner("Executing Double-Engine Structural Matrix (Prophet + SARIMAX Alignment)..."):
+        try:
+            f_dates, f_prices, f_lower, f_upper, b_dates, b_prices, b_lower, b_upper = dynamic_timeline_forecasting(
+                model, scaler, df, pd.Timestamp(chosen_start_date), n_days=forecast_days
+            )
+        except Exception as _err:
+            st.error(f"Hybrid Matrix Strategy Core fault: {_err}")
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║                    KPI METRICS BANNER                    ║

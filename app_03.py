@@ -275,21 +275,19 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
     except ImportError:
         return np.zeros(len(target_dates))
 
-    if len(target_dates) == 0:
-        return np.zeros(0)
+    if len(target_dates) == 0 or len(history_series) < 30:
+        return np.zeros(len(target_dates))
 
-    # 1. Prophet: Decompose macro seasonality and hidden waves
+    # 1. Prophet Layer
     pdf = history_series.reset_index()
     pdf.columns = ["ds", "y"]
     m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
     m_prophet.fit(pdf)
     future = pd.DataFrame({"ds": target_dates})
     forecast_prophet = m_prophet.predict(future)
-    
-    # Isolate true seasonal/pattern component fluctuations relative to the anchor terminal close
     prophet_pattern = forecast_prophet["yhat"].values - history_series.iloc[-1]
 
-    # 2. SARIMAX: Model tracking error changes and high frequency autoregressive steps
+    # 2. SARIMAX Layer
     try:
         sarimax_mod = SARIMAX(history_series.values, order=(1,1,1), seasonal_order=(1,0,0,5))
         s_res = sarimax_mod.fit(disp=False)
@@ -297,14 +295,13 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
     except Exception:
         sarimax_error_seasonality = prophet_pattern
 
-    # Blend components linearly to provide structural error limits + multi-season adjustments
     return (0.55 * prophet_pattern) + (0.45 * sarimax_error_seasonality)
 
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     """
-    Iterative Additive Structural Core. Imputes exact historical data markers,
-    calculates structural gaps, and injects seasonality + error levels sequentially.
+    Robust Past-Date Aware Iterative Additive Engine.
+    Imputes historical markers safely without triggering slicing index faults.
     """
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -318,38 +315,38 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     
     # ─── SCENARIO 1: STARTING DATE LANDS INSIDE / BEFORE ACTUAL DATA MARKERS ───
     if target_start <= db_max_date:
-        for idx, curr_date in enumerate(biz_dates):
+        for curr_date in biz_dates:
             if curr_date <= db_max_date:
                 # Direct Ground Truth Imputation Override
                 preds_prices.append(float(df.loc[curr_date, "Adj Close"]))
             else:
-                # Multi-Step Sequence Rolling Window Prediction Loop
-                lookback_context = df[df.index < curr_date].tail(LOOKBACK)["Adj Close"].tolist()
+                # Past-date aware lookback query strategy
+                history_up_to = df[df.index < curr_date]
+                if len(history_up_to) < LOOKBACK:
+                    # Fallback context window anchor if data index bounds are exceeded
+                    history_up_to = df.head(LOOKBACK)
+                    
+                lookback_context = history_up_to.tail(LOOKBACK)["Adj Close"].tolist()
                 
-                # Dynamic backfill utilizing previous hybrid evaluations
                 idx_offset = len(preds_prices) - 1
                 while len(lookback_context) < LOOKBACK and idx_offset >= 0:
                     lookback_context.insert(0, preds_prices[idx_offset])
                     idx_offset -= 1
                 
-                # Fetch fresh additive parameters based on trailing 1-year historical profile
-                hist_frame = df[df.index < curr_date].tail(252)["Adj Close"]
+                hist_frame = history_up_to.tail(252)["Adj Close"]
                 additive_structural_delta = extract_additive_components(hist_frame, pd.DatetimeIndex([curr_date]))[0]
 
                 x_scaled = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
                 x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
                 
                 raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
-                
-                # Reinject combined patterns, levels of seasonality, and error metrics back into sequence loop
                 preds_prices.append(raw_pred + (additive_structural_delta * 0.75))
 
-    # ─── SCENARIO 2: STARTING DATE LANDS IN FAR FUTURE (Explicit Bridge Required) ───
+    # ─── SCENARIO 2: STARTING DATE LANDS IN FAR FUTURE (Gap Bridge Layer Active) ───
     else:
         working_df = df[["Adj Close"]].copy()
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
         
-        # 1. Fill implicit layout gaps using an iterative blocks framework
         if len(gap_range) > 0:
             current_gap_ptr = gap_range[0]
             while current_gap_ptr <= gap_range[-1]:
@@ -371,7 +368,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                     
                     working_df.loc[g_date, "Adj Close"] = final_bridged_val
                     
-                    # Log to output matrices to restore physical visualization trail
                     bridge_dates.append(g_date)
                     bridge_prices.append(final_bridged_val)
                     
@@ -382,7 +378,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                     
                 current_gap_ptr = chunk_end + pd.Timedelta(days=1)
 
-        # 2. Extract and project the target forecast window out from the reconstructed boundary
         target_additive_signals = extract_additive_components(working_df.tail(252)["Adj Close"], biz_dates)
         for idx, b_date in enumerate(biz_dates):
             seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
@@ -395,7 +390,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
             preds_prices.append(final_target_val)
             working_df.loc[b_date, "Adj Close"] = final_target_val
 
-    # Structure absolute calculation metrics across variation bounds
     preds_prices = np.array(preds_prices, dtype=np.float32)
     lower_bounds, upper_bounds = [], []
     

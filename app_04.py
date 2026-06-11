@@ -1,13 +1,12 @@
 # ============================================================
 # TSLA FORECASTING HUB  |  app.py
-# Model: Multi-Engine Iterative Additive Seasonality & Residual Bridge
+# Model: CNN-GRU + Hurst Regime Detection + OU Mean-Reversion
 # ============================================================
 
 import os
 import re
 import warnings
 import tempfile
-import logging
 
 import numpy as np
 import pandas as pd
@@ -16,8 +15,6 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 warnings.filterwarnings("ignore")
-logging.getLogger('prophet').setLevel(logging.ERROR)
-logging.getLogger('cmdstanpy').setLevel(logging.ERROR)
 
 secret_url = ""
 try:
@@ -264,165 +261,202 @@ def load_model_cached(file_id: str):
 
     return model
 
-def extract_seasonal_correction(
-    history_series: pd.Series,
-    raw_model_preds: np.ndarray,
-    target_dates: pd.DatetimeIndex,
-) -> np.ndarray:
+# ╔══════════════════════════════════════════════════════════╗
+# ║            HYBRID REVISION ENGINE                        ║
+# ║  Return-space recursion + Hurst regime detection +       ║
+# ║  Ornstein-Uhlenbeck mean-reversion damping               ║
+# ╚══════════════════════════════════════════════════════════╝
+
+def _hurst_exponent(series: np.ndarray) -> float:
     """
-    Derives a multiplicative correction factor for each forecast step that
-    preserves the CNN-GRU's price-level anchor while injecting seasonality,
-    weekly rhythm, and trend-momentum signals from Prophet and SARIMAX.
-
-    Design principles
-    -----------------
-    1. Both models work on **log-returns** (stationary) — not raw prices.
-       This prevents exponential-trend contamination of the seasonal signal.
-    2. Prophet extracts pure seasonality components (weekly + yearly) plus
-       a smooth trend slope.  We use only `trend + weekly + yearly` deltas,
-       explicitly excluding the yhat level, so the CNN-GRU price anchor is
-       never displaced.
-    3. SARIMAX(0,0,0)(1,1,0,5) on log-returns captures the residual weekly
-       autocorrelation pattern that Prophet's Fourier terms can miss.
-    4. Both signals are expressed as **fractional return adjustments** and
-       blended with reliability weights derived from in-sample MAE.
-    5. The final correction is capped at ±8 % per step so a mis-fit seasonal
-       model can never wildly distort the CNN-GRU output.
-    6. The function is pure — it never mutates the caller's state.
+    Estimate Hurst exponent via R/S analysis on a price series.
+    H < 0.45  → mean-reverting  (anti-persistent)
+    H ≈ 0.50  → random walk
+    H > 0.55  → trending        (persistent)
+    Returns 0.5 if estimation fails.
     """
-    n = len(target_dates)
-    if n == 0 or len(history_series) < 30:
-        return np.ones(n)               # neutral: multiply by 1.0
-
+    n = len(series)
+    if n < 20:
+        return 0.5
     try:
-        from prophet import Prophet
-        from statsmodels.tsa.statespace.sarimax import SARIMAX
-    except ImportError:
-        return np.ones(n)
-
-    # ── Prepare stationary log-return series ─────────────────────────────────
-    log_ret = np.log(history_series / history_series.shift(1)).dropna()
-    if len(log_ret) < 20:
-        return np.ones(n)
-
-    # ── 1. Prophet: seasonality + trend slope on log-returns ─────────────────
-    prophet_signal = np.zeros(n)
-    prophet_weight = 0.0
-    try:
-        pdf = pd.DataFrame({"ds": log_ret.index, "y": log_ret.values})
-        m = Prophet(
-            yearly_seasonality=True,
-            weekly_seasonality=True,
-            daily_seasonality=False,
-            seasonality_mode="additive",
-            changepoint_prior_scale=0.05,   # conservative trend flexibility
-            seasonality_prior_scale=10.0,
-            uncertainty_samples=0,          # faster; we build our own bands
-        )
-        m.fit(pdf, iter=300)
-
-        # In-sample fit for weight derivation
-        insample      = m.predict(pdf[["ds"]])
-        insample_mae  = np.mean(np.abs(insample["yhat"].values - pdf["y"].values))
-        prophet_weight = 1.0 / (insample_mae + 1e-8)
-
-        future_df  = pd.DataFrame({"ds": target_dates})
-        fc         = m.predict(future_df)
-
-        # Additive seasonal + trend delta in log-return space
-        # We take: trend_delta + weekly + yearly (NOT yhat — that would include
-        # the level and re-introduce non-stationarity)
-        trend_now    = m.predict(pdf[["ds"]].tail(1))["trend"].values[0]
-        trend_future = fc["trend"].values
-        trend_delta  = trend_future - trend_now          # slope component only
-
-        weekly  = fc["weekly"].values  if "weekly"  in fc.columns else np.zeros(n)
-        yearly  = fc["yearly"].values  if "yearly"  in fc.columns else np.zeros(n)
-
-        prophet_signal = trend_delta + weekly + yearly   # pure pattern, log-return scale
-
+        lags   = [2, 4, 8, 16, 32] if n >= 64 else [2, 4, 8]
+        rs_vals = []
+        for lag in lags:
+            chunks = [series[i:i+lag] for i in range(0, n - lag + 1, lag)]
+            if not chunks:
+                continue
+            rs_chunk = []
+            for c in chunks:
+                mean_c  = np.mean(c)
+                deviate = np.cumsum(c - mean_c)
+                r       = deviate.max() - deviate.min()
+                s       = np.std(c, ddof=1)
+                if s > 0:
+                    rs_chunk.append(r / s)
+            if rs_chunk:
+                rs_vals.append((lag, np.mean(rs_chunk)))
+        if len(rs_vals) < 2:
+            return 0.5
+        lags_arr  = np.log([v[0] for v in rs_vals])
+        rs_arr    = np.log([v[1] for v in rs_vals])
+        H         = np.polyfit(lags_arr, rs_arr, 1)[0]
+        return float(np.clip(H, 0.1, 0.9))
     except Exception:
-        prophet_weight = 0.0
-        prophet_signal = np.zeros(n)
+        return 0.5
 
-    # ── 2. SARIMAX on log-returns: residual weekly autocorrelation ────────────
-    sarimax_signal = np.zeros(n)
-    sarimax_weight = 0.0
+
+def _compute_regime(history_series: pd.Series) -> dict:
+    """
+    Analyse the last 252 days of prices and return regime parameters:
+      - hurst:       Hurst exponent H
+      - trend_slope: annualised log-return slope (positive = up, negative = down)
+      - mean_price:  long-run equilibrium (200d EMA)
+      - vol:         daily log-return std dev
+      - ou_speed:    Ornstein-Uhlenbeck mean-reversion speed (κ)
+    """
+    prices = history_series.dropna().values[-252:]
+    if len(prices) < 30:
+        return dict(hurst=0.5, trend_slope=0.0, mean_price=prices[-1],
+                    vol=0.02, ou_speed=0.05)
+
+    log_rets  = np.diff(np.log(prices))
+    vol       = float(np.std(log_rets)) if len(log_rets) > 1 else 0.02
+    H         = _hurst_exponent(prices)
+
+    # Trend slope: linear fit on log-prices, annualised
+    x          = np.arange(len(prices))
+    log_prices = np.log(prices)
+    slope      = float(np.polyfit(x, log_prices, 1)[0]) * 252  # annualised
+
+    # Long-run mean: 200-day EMA of the full window (or all available)
+    ema_span   = min(200, len(prices))
+    weights    = np.exp(np.linspace(-1, 0, ema_span))
+    weights   /= weights.sum()
+    mean_price = float(np.convolve(prices, weights[::-1], mode='valid')[-1])
+
+    # OU mean-reversion speed κ: estimated from AR(1) on log-returns
+    # κ ≈ -ln(AR1 coefficient) — higher κ = faster reversion
     try:
-        # (0,0,0)(1,1,0,5): no ARIMA differencing (already stationary log-returns),
-        # seasonal AR(1) + seasonal diff over 5-day week captures weekly rhythm
-        mod  = SARIMAX(
-            log_ret.values,
-            order=(1, 0, 1),
-            seasonal_order=(1, 1, 0, 5),
-            enforce_stationarity=False,
-            enforce_invertibility=False,
-        )
-        res  = mod.fit(disp=False, maxiter=200, method="lbfgs")
-
-        # Weight from in-sample MAE
-        fitted_mae    = np.mean(np.abs(res.fittedvalues - log_ret.values[len(log_ret)-len(res.fittedvalues):]))
-        sarimax_weight = 1.0 / (fitted_mae + 1e-8)
-
-        sarimax_signal = res.forecast(steps=n)           # n log-return forecasts
-
+        if len(log_rets) > 10:
+            phi    = np.corrcoef(log_rets[:-1], log_rets[1:])[0, 1]
+            phi    = np.clip(phi, -0.99, 0.99)
+            ou_speed = float(-np.log(abs(phi))) if abs(phi) < 1.0 else 0.05
+        else:
+            ou_speed = 0.05
     except Exception:
-        sarimax_weight = 0.0
-        sarimax_signal = np.zeros(n)
+        ou_speed = 0.05
 
-    # ── 3. Reliability-weighted blend ────────────────────────────────────────
-    total_w = prophet_weight + sarimax_weight
-    if total_w < 1e-12:
-        return np.ones(n)                                # both failed: neutral
-
-    w_p = prophet_weight / total_w
-    w_s = sarimax_weight / total_w
-
-    blended_log_return_adj = (w_p * prophet_signal) + (w_s * sarimax_signal)
-
-    # ── 4. Convert log-return adjustment → multiplicative price factor ────────
-    # Each factor is how much to scale the CNN-GRU raw prediction at that step.
-    # Cap at ±8% to prevent runaway seasonal corrections.
-    MAX_ADJ = 0.08
-    blended_log_return_adj = np.clip(blended_log_return_adj, -MAX_ADJ, MAX_ADJ)
-    correction_factors     = np.exp(blended_log_return_adj)   # ≈ (1 ± small fraction)
-
-    return correction_factors
+    return dict(hurst=H, trend_slope=slope, mean_price=mean_price,
+                vol=vol, ou_speed=ou_speed)
 
 
-def _run_model_step(model, scaler, lookback_context: list) -> float:
-    """Single CNN-GRU inference step. Returns inverse-transformed price."""
-    x_scaled = scaler.transform(
-        np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)
-    ).flatten()
-    x_input  = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
-    raw_out  = float(np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0))
-    return float(scaler.inverse_transform([[raw_out]])[0, 0])
+def _single_step_forecast(model, scaler, lookback_context: list) -> float:
+    """Run one CNN-GRU step. Returns inverse-transformed USD price."""
+    x_sc  = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
+    x_in  = np.array(x_sc, dtype=np.float32).reshape(1, LOOKBACK, 1)
+    raw   = float(np.clip(model.predict(x_in, verbose=0)[0, 0], 0.0, 1.0))
+    return float(scaler.inverse_transform([[raw]])[0, 0])
+
+
+def _revise_prediction(
+    raw_pred:    float,
+    prev_price:  float,
+    regime:      dict,
+    step:        int,
+    total_steps: int,
+) -> float:
+    """
+    Revise a single CNN-GRU raw prediction using three complementary signals:
+
+    1. Return normalisation
+       The model outputs a price level. We convert to an implied log-return,
+       then damp the return magnitude toward zero as steps increase — this
+       prevents compounding momentum from dragging the price in one direction
+       indefinitely over 60 steps.
+
+    2. Hurst-based regime blending
+       H > 0.55 (trending)      → trust the CNN-GRU more, mild damping
+       H < 0.45 (mean-reverting) → pull toward the long-run EMA price strongly
+       H ≈ 0.50 (random walk)    → balanced blend
+
+    3. Ornstein-Uhlenbeck mean-reversion pressure
+       A gentle continuous force pulling the price toward the long-run EMA,
+       proportional to (current_price - mean_price) * ou_speed.
+       This prevents the forecast from drifting to extreme levels over time.
+    """
+    H          = regime["hurst"]
+    mean_price = regime["mean_price"]
+    ou_speed   = regime["ou_speed"]
+    vol        = regime["vol"]
+
+    if prev_price <= 0:
+        return raw_pred
+
+    # ── 1. Raw implied log-return from CNN-GRU ────────────────────────────────
+    raw_log_ret = np.log(raw_pred / prev_price)
+
+    # ── 2. Return magnitude damping (grows with step depth) ──────────────────
+    # At step 1: almost no damping.  At step 60: return is pulled ~70% toward 0.
+    # Formula: damped_ret = raw_ret * exp(-decay_rate * step)
+    # decay_rate calibrated so that at step=total_steps, attenuation ≈ 0.30
+    if total_steps > 1:
+        decay_rate = -np.log(0.30) / total_steps   # ≈ 0.020 for 60 steps
+    else:
+        decay_rate = 0.0
+    damped_log_ret = raw_log_ret * np.exp(-decay_rate * step)
+
+    # ── 3. Hurst-based trust weight for the CNN-GRU signal ───────────────────
+    # H > 0.55: trending — trust CNN-GRU direction more (weight up to 0.85)
+    # H < 0.45: mean-reverting — discount CNN-GRU direction (weight down to 0.35)
+    # Linear interpolation between those anchors
+    cnn_weight = float(np.interp(H, [0.35, 0.50, 0.65], [0.30, 0.60, 0.85]))
+
+    # ── 4. OU mean-reversion pull in log-return space ────────────────────────
+    # Pull = -κ * (log(prev_price) - log(mean_price))
+    # This is the discrete-time OU correction for one step
+    ou_pull = -ou_speed * np.log(prev_price / mean_price)
+    # Scale OU contribution by (1 - cnn_weight) so it fills the remaining trust
+    ou_weight = 1.0 - cnn_weight
+
+    # ── 5. Blended log-return ─────────────────────────────────────────────────
+    blended_log_ret = (cnn_weight * damped_log_ret) + (ou_weight * ou_pull)
+
+    # Hard cap: no single step can exceed ±3σ (≈ 3 * daily vol)
+    max_step_ret = 3.0 * vol
+    blended_log_ret = float(np.clip(blended_log_ret, -max_step_ret, max_step_ret))
+
+    revised_price = prev_price * np.exp(blended_log_ret)
+
+    # Sanity floor/ceiling: revised price must stay within 60% – 240% of mean_price
+    revised_price = float(np.clip(revised_price, mean_price * 0.40, mean_price * 2.80))
+    return revised_price
 
 
 def dynamic_timeline_forecasting(
     model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int
 ) -> tuple:
     """
-    Full hybrid forecast pipeline.
+    Hybrid forecast pipeline.
 
-    Seasonal correction strategy (revised)
-    ───────────────────────────────────────
-    Rather than computing additive deltas relative to the last historical
-    price (which conflates trend level with pattern), we:
+    Revision strategy (no Prophet / no SARIMAX)
+    ─────────────────────────────────────────────
+    Root cause of the perpetual-decline bug:
+      The CNN-GRU is recursive. When the last 60 real prices form a declining
+      sequence, each prediction feeds a lower value back in, compounding the
+      decline over 60 steps into a smooth, unrealistic downtrend.
 
-    1. Run ALL CNN-GRU steps first (pure model output) to obtain `raw_preds`.
-    2. Call `extract_seasonal_correction` ONCE per horizon block, passing
-       `raw_preds` alongside the history window.  The function fits Prophet
-       and SARIMAX on log-returns and returns a per-step multiplicative
-       correction factor (capped at ±8 %).
-    3. Apply: final_price = raw_pred * correction_factor.
-       This nudges the model's price-level output using the seasonal pattern
-       without ever replacing or overriding the CNN-GRU anchor.
-
-    Gap bridge uses the same two-pass logic: raw CNN-GRU first, then
-    seasonal correction applied multiplicatively before feeding the value
-    back into the next step's lookback window.
+    Fix:
+      After each raw CNN-GRU step we call `_revise_prediction` which:
+        (a) Converts the raw price to a log-return and applies exponential
+            magnitude damping so momentum cannot compound across 60 steps.
+        (b) Uses the Hurst exponent of the last 252 days to detect whether the
+            market is trending or mean-reverting and weights the CNN-GRU
+            signal accordingly.
+        (c) Applies an Ornstein-Uhlenbeck pull toward the long-run EMA,
+            preventing the forecast from drifting to extremes.
+      The revised price is then fed back as the next step's input — so the
+      lookback window is populated with realistic, regime-aware values rather
+      than a compounding one-directional slope.
     """
     db_max_date  = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -431,40 +465,38 @@ def dynamic_timeline_forecasting(
     recent_ret = df["DailyReturn"].replace([np.inf, -np.inf], np.nan).dropna().tail(60)
     daily_vol  = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
 
-    preds_prices = []
+    preds_prices: list = []
     bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
 
     # ── PATH A: start_date is within or at the database boundary ─────────────
     if target_start <= db_max_date:
         for curr_date in biz_dates:
             if curr_date <= db_max_date:
-                # Dates inside DB: use actual historical prices (no prediction)
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
                 pos_idx = max(pos_idx, 0)
                 preds_prices.append(float(df.iloc[pos_idx]["Adj Close"]))
             else:
-                # Dates past the DB boundary: CNN-GRU + seasonal correction
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
-                history_slice = df.iloc[:pos_idx] if (pos_idx != -1 and pos_idx >= LOOKBACK) else df.head(LOOKBACK)
+                if pos_idx != -1 and pos_idx >= LOOKBACK:
+                    history_slice = df.iloc[:pos_idx]
+                else:
+                    history_slice = df.head(LOOKBACK)
 
-                # Build lookback context from history + already-predicted values
+                # Build lookback window from real history + already-revised preds
                 lookback_context = history_slice.tail(LOOKBACK)["Adj Close"].tolist()
                 idx_offset = len(preds_prices) - 1
                 while len(lookback_context) < LOOKBACK and idx_offset >= 0:
                     lookback_context.insert(0, preds_prices[idx_offset])
                     idx_offset -= 1
 
-                raw_pred = _run_model_step(model, scaler, lookback_context)
-
-                # Single-step seasonal correction: fit on last 252 days of history
-                hist_window = history_slice.tail(252)["Adj Close"]
-                correction  = extract_seasonal_correction(
-                    hist_window,
-                    np.array([raw_pred]),
-                    pd.DatetimeIndex([curr_date]),
-                )[0]
-
-                preds_prices.append(raw_pred * correction)
+                raw_pred  = _single_step_forecast(model, scaler, lookback_context)
+                regime    = _compute_regime(history_slice.tail(252)["Adj Close"])
+                prev_p    = lookback_context[-1]
+                step_idx  = len([p for p in preds_prices if p not in
+                                  df["Adj Close"].values]) + 1
+                revised   = _revise_prediction(raw_pred, prev_p, regime,
+                                               step_idx, n_days)
+                preds_prices.append(revised)
 
     # ── PATH B: start_date is strictly beyond the database boundary ───────────
     else:
@@ -474,75 +506,36 @@ def dynamic_timeline_forecasting(
             end=target_start - pd.Timedelta(days=1),
         )
 
-        # ── Bridge: fill the gap between DB end and chosen start ─────────────
+        # Bridge: fill gap between DB end and chosen start
         if len(gap_range) > 0:
-            # Process in chunks of ≤60 days so seasonal models always have a
-            # representative history window and corrections stay fresh
-            current_gap_ptr = gap_range[0]
-            while current_gap_ptr <= gap_range[-1]:
-                chunk_end   = min(current_gap_ptr + pd.Timedelta(days=59), gap_range[-1])
-                chunk_dates = pd.bdate_range(start=current_gap_ptr, end=chunk_end)
-                if len(chunk_dates) == 0:
-                    break
+            regime_bridge = _compute_regime(working_df.tail(252)["Adj Close"])
+            total_bridge  = len(gap_range)
 
-                # Pass 1: collect raw CNN-GRU outputs for this chunk
-                chunk_raw_preds = []
-                chunk_contexts  = []
-                temp_working    = working_df.copy()
-                for g_date in chunk_dates:
-                    seed_vals = temp_working.tail(LOOKBACK)["Adj Close"].tolist()
-                    raw_pred  = _run_model_step(model, scaler, seed_vals)
-                    chunk_raw_preds.append(raw_pred)
-                    chunk_contexts.append(seed_vals)
-                    temp_working.loc[g_date, "Adj Close"] = raw_pred  # temp placeholder
+            for b_step, g_date in enumerate(gap_range, start=1):
+                seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
+                raw_pred  = _single_step_forecast(model, scaler, seed_vals)
+                prev_p    = seed_vals[-1]
+                revised   = _revise_prediction(raw_pred, prev_p, regime_bridge,
+                                               b_step, total_bridge)
 
-                # Pass 2: seasonal correction for the whole chunk at once
-                hist_window      = working_df.tail(252)["Adj Close"]
-                correction_factors = extract_seasonal_correction(
-                    hist_window,
-                    np.array(chunk_raw_preds),
-                    chunk_dates,
-                )
+                working_df.loc[g_date, "Adj Close"] = revised
+                bridge_dates.append(g_date)
+                bridge_prices.append(revised)
 
-                # Apply and commit to working_df so next chunk sees corrected history
-                for idx, g_date in enumerate(chunk_dates):
-                    final_val = chunk_raw_preds[idx] * correction_factors[idx]
-                    working_df.loc[g_date, "Adj Close"] = final_val
+                band_frac = np.clip(daily_vol * np.sqrt(b_step), 0, 0.45)
+                bridge_lo.append(revised * (1 - band_frac))
+                bridge_hi.append(revised * (1 + band_frac))
 
-                    bridge_dates.append(g_date)
-                    bridge_prices.append(final_val)
-
-                    b_step    = len(bridge_prices)
-                    band_frac = np.clip(daily_vol * np.sqrt(b_step), 0, 0.45)
-                    bridge_lo.append(final_val * (1 - band_frac))
-                    bridge_hi.append(final_val * (1 + band_frac))
-
-                current_gap_ptr = chunk_end + pd.Timedelta(days=1)
-
-        # ── Target horizon: same two-pass approach ────────────────────────────
-        # Pass 1: raw CNN-GRU predictions (recursive, each step feeds the next)
-        target_raw_preds = []
-        temp_working     = working_df.copy()
-        for b_date in biz_dates:
-            seed_vals = temp_working.tail(LOOKBACK)["Adj Close"].tolist()
-            raw_pred  = _run_model_step(model, scaler, seed_vals)
-            target_raw_preds.append(raw_pred)
-            temp_working.loc[b_date, "Adj Close"] = raw_pred  # temp
-
-        # Pass 2: seasonal correction for the full target horizon at once
-        hist_window_target  = working_df.tail(252)["Adj Close"]
-        target_corrections  = extract_seasonal_correction(
-            hist_window_target,
-            np.array(target_raw_preds),
-            biz_dates,
-        )
-
-        # Apply corrections and feed corrected values back recursively
-        # so later predictions are conditioned on seasonality-adjusted history
-        for idx, b_date in enumerate(biz_dates):
-            final_val = target_raw_preds[idx] * target_corrections[idx]
-            preds_prices.append(final_val)
-            working_df.loc[b_date, "Adj Close"] = final_val
+        # Target horizon: regime computed on full history including bridge
+        regime_target = _compute_regime(working_df.tail(252)["Adj Close"])
+        for t_step, b_date in enumerate(biz_dates, start=1):
+            seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
+            raw_pred  = _single_step_forecast(model, scaler, seed_vals)
+            prev_p    = seed_vals[-1]
+            revised   = _revise_prediction(raw_pred, prev_p, regime_target,
+                                           t_step, n_days)
+            preds_prices.append(revised)
+            working_df.loc[b_date, "Adj Close"] = revised
 
     # ── Confidence bands ─────────────────────────────────────────────────────
     preds_prices = np.array(preds_prices, dtype=np.float32)

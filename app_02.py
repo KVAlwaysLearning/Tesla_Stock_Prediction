@@ -660,11 +660,11 @@ with tab2:
             st.dataframe(pd.DataFrame(fc_rows), use_container_width=True, hide_index=True)
 
 
-# ════════════════════════════════════════════════════════════
-#  TAB 3 — ADVANCED VISUALIZATIONS (INTEGRATED FUTURE PLOTS)
-# ════════════════════════════════════════════════════════════
+# ============================================================
+#  TAB 3 — ADVANCED VISUALIZATIONS (REVISED COMPLETELY)
+# ============================================================
 with tab3:
-    # Build complete combined historical + future projection dataset matrix
+    # 1. Build complete combined historical + future projection dataset matrix
     df_vis = df.copy()
     if f_prices is not None:
         df_future = pd.DataFrame(index=f_dates)
@@ -672,7 +672,7 @@ with tab3:
         df_future["Open"] = f_prices
         df_future["High"] = f_upper
         df_future["Low"] = f_lower
-        df_future["Volume"] = df["Volume"].iloc[-1] # project forward last known volume node
+        df_future["Volume"] = df["Volume"].iloc[-1]  # project forward last known volume node
         df_future["Spread"] = df_future["High"] - df_future["Low"]
         df_future["BB_Upper"] = f_upper
         df_future["BB_Lower"] = f_lower
@@ -689,27 +689,48 @@ with tab3:
         df_vis = df_vis[~df_vis.index.duplicated(keep='first')]
         df_vis.sort_index(inplace=True)
 
+    # 2. Horizon Selection Interfaces
     fa, fb = st.columns(2)
     with fa:
-        viz_start = st.date_input("From Range Marker", value=df.index[-90].date(), min_value=df.index[0].date(), max_value=df_vis.index[-1].date(), key="v_start")
+        viz_start = st.date_input(
+            "From Range Marker", 
+            value=df.index[-90].date(), 
+            min_value=df.index[0].date(), 
+            max_value=df_vis.index[-1].date(), 
+            key="v_start"
+        )
     with fb:
-        viz_end = st.date_input("To Range Marker (Includes Forecast Horizon)", value=df_vis.index[-1].date(), min_value=df.index[0].date(), max_value=df_vis.index[-1].date(), key="v_end")
+        viz_end = st.date_input(
+            "To Range Marker (Includes Forecast Horizon)", 
+            value=df_vis.index[-1].date(), 
+            min_value=df.index[0].date(), 
+            max_value=df_vis.index[-1].date(), 
+            key="v_end"
+        )
 
     if viz_start >= viz_end:
         st.warning("⚠️ Timeline validation error: Start index must be before stop marker.")
         st.stop()
 
+    # Create filtered layout array slice
     dv = df_vis.loc[str(viz_start):str(viz_end)].copy()
 
+    # 📊 Row 1: Unified Pricing Lines + Volumes
     r1a, r1b = st.columns([3, 2])
     with r1a:
         fig1 = go.Figure()
-        fig1.add_trace(go.Scatter(x=dv.index, y=dv["Close"], name="Unified Close (History + Forecast)", line=dict(color=ACCENT, width=1.8)))
+        fig1.add_trace(go.Scatter(
+            x=dv.index, y=dv["Close"], 
+            name="Unified Close (History + Forecast)", 
+            line=dict(color=ACCENT, width=1.8)
+        ))
         for col, col_color in [("MA30", BLUE), ("MA90", PURPLE), ("MA200", RED)]:
             if col in dv.columns and dv[col].notna().any():
-                fig1.add_trace(go.Scatter(x=dv.index, y=dv[col], name=col, line=dict(color=col_color, width=1, dash="dot")))
-        
-        # FIX: Pass override_yaxis into base_layout directly to prevent duplication crash
+                fig1.add_trace(go.Scatter(
+                    x=dv.index, y=dv[col], 
+                    name=col, 
+                    line=dict(color=col_color, width=1, dash="dot")
+                ))
         fig1.update_layout(**base_layout(360, "Systemic Pricing Vectors & Forecast Concat", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -719,22 +740,35 @@ with tab3:
         fig2.update_layout(**base_layout(360, "Volume Profile Distribution Metrics"))
         st.plotly_chart(fig2, use_container_width=True)
 
+    # 📊 Row 2: Structural Candlesticks + Intraday High/Low Dispersion Spread
     r2a, r2b = st.columns([3, 2])
     with r2a:
-        fig3 = go.Figure(go.Candlestick(x=dv.index, open=dv["Open"], high=dv["High"], low=dv["Low"], close=dv["Close"], increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Layer"))
-        fig3.update_layout(**base_layout(360, "High-Frequency Structural Candlestick + Variance Channels (Forecast Extended)"), xaxis_rangeslider_visible=False, yaxis=dict(tickprefix="$"))
+        fig3 = go.Figure(go.Candlestick(
+            x=dv.index, open=dv["Open"], high=dv["High"], 
+            low=dv["Low"], close=dv["Close"], 
+            increasing_line_color=GREEN, decreasing_line_color=RED, 
+            name="OHLC Layer"
+        ))
+        # FIX: Explicitly updated config variables safely passed as an additional update dictionary call
+        fig3.update_layout(**base_layout(360, "High-Frequency Structural Candlestick + Variance Channels (Forecast Extended)", override_yaxis=dict(tickprefix="$")))
+        fig3.update_layout(xaxis_rangeslider_visible=False)
         st.plotly_chart(fig3, use_container_width=True)
 
     with r2b:
-        fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(232,200,74,0.12)", line=dict(color=ACCENT, width=1.2)))
-        fig4.update_layout(**base_layout(360, "Intraday Risk Dispersion (High − Low Variance Channel)"), yaxis=dict(tickprefix="$"))
+        fig4 = go.Figure(go.Scatter(
+            x=dv.index, y=dv["Spread"], 
+            fill="tozeroy", fillcolor="rgba(232,200,74,0.12)", 
+            line=dict(color=ACCENT, width=1.2)
+        ))
+        fig4.update_layout(**base_layout(360, "Intraday Risk Dispersion (High − Low Variance Channel)", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig4, use_container_width=True)
 
+    # 📊 Row 3: Macro Annual Allocation Bars + Boxplots Seasonality Matrix
     r4a, r4b = st.columns(2)
     with r4a:
         yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
         fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
-        fig7.update_layout(**base_layout(360, "Macro Annual Mean Close Allocation Values (Including Forecast Years)"), yaxis=dict(tickprefix="$"))
+        fig7.update_layout(**base_layout(360, "Macro Annual Mean Close Allocation Values (Including Forecast Years)", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig7, use_container_width=True)
 
     with r4b:
@@ -743,6 +777,10 @@ with tab3:
         for m_idx, m_name in enumerate(months, 1):
             subset = dv[dv.index.month == m_idx]["Close"].dropna()
             if not subset.empty:
-                fig8.add_trace(go.Box(y=subset, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(91,141,238,0.18)"))
-        fig8.update_layout(**base_layout(360, "Seasonality Structural Distribution Matrices"), showlegend=False, yaxis=dict(tickprefix="$"))
+                fig8.add_trace(go.Box(
+                    y=subset, name=m_name, 
+                    marker_color=BLUE, line_color=BLUE, 
+                    fillcolor="rgba(91,141,238,0.18)"
+                ))
+        fig8.update_layout(**base_layout(360, "Seasonality Structural Distribution Matrices"), showlegend=False)
         st.plotly_chart(fig8, use_container_width=True)

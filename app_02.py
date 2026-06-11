@@ -295,7 +295,12 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     # ── CASE 1: Forecast starts inside historical range ──
     if target_start <= db_max_date:
         sim_dates = pd.bdate_range(start=target_start, end=biz_dates[-1])
-        history_slice = df[df.index < target_start].tail(LOOKBACK)
+        
+        # Safe lookup for history slice fallback
+        lookback_df = df[df.index < target_start]
+        if lookback_df.empty:
+            lookback_df = df.head(LOOKBACK)
+        history_slice = lookback_df.tail(LOOKBACK)
         scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
         
         sim_cache = {}
@@ -303,10 +308,12 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         
         for curr_date in sim_dates:
             if curr_date <= db_max_date:
+                # If date exists in database, plot actual data with 100% confidence (bounds equal actual value)
                 actual_val = float(df.loc[curr_date, "Adj Close"])
                 sim_cache[curr_date] = (actual_val, actual_val, actual_val)
                 scaled_seed.append(float(scaler.transform([[actual_val]])[0,0]))
             else:
+                # Project forward out of database boundaries via recursive neural networks
                 x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
                 out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
                 pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
@@ -317,7 +324,12 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                 forecast_step_counter += 1
                 
         for d in biz_dates:
-            p, lo, hi = sim_cache[d] if d in sim_cache else sim_cache[db_max_date]
+            if d in sim_cache:
+                p, lo, hi = sim_cache[d]
+            else:
+                # Fallback safeguard
+                last_cached_val = float(df["Adj Close"].iloc[-1])
+                p, lo, hi = last_cached_val, last_cached_val, last_cached_val
             preds_prices.append(p)
             lower_bounds.append(lo)
             upper_bounds.append(hi)
@@ -545,7 +557,12 @@ with tab1:
         fig_t.add_trace(go.Scatter(x=ctx_df.index, y=ctx_df["BB_Upper"], name="BB Upper Band", line=dict(color=MUTED, width=0.8, dash="dot")))
         fig_t.add_trace(go.Scatter(x=ctx_df.index, y=ctx_df["BB_Lower"], name="BB Lower Band", line=dict(color=MUTED, width=0.8, dash="dot"), fill="tonexty", fillcolor="rgba(122,128,153,0.03)"))
         
-        fig_t.update_layout(**base_layout(260, "Trailing Trend Baseline Metrics Context Overlay", override_yaxis=dict(tickprefix="$")))
+        # RESTORED: Horizontal Execution Dotted Limits Lines
+        fig_t.add_hline(y=eff_entry, line_color=ACCENT, line_width=1.2, line_dash="solid", annotation_text="Calculated Entry Target")
+        fig_t.add_hline(y=take_profit, line_color=GREEN, line_width=1.2, line_dash="dash", annotation_text="Take Profit Threshold (1:2)")
+        fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line")
+
+        fig_t.update_layout(**base_layout(290, "Trailing Trend Baseline Metrics Context Overlay", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig_t, use_container_width=True)
 
 

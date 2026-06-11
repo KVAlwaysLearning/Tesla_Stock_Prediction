@@ -613,9 +613,9 @@ with tab1:
         st.plotly_chart(fig_t, use_container_width=True)
 
 
-# ════════════════════════════════════════════════════════════
-#  TAB 2 — FORECAST ENGINE
-# ════════════════════════════════════════════════════════════
+# ============================================================
+#  TAB 2 — FORECAST ENGINE (FIXED LAYOUT CLASH)
+# ============================================================
 with tab2:
     if model is None:
         empty_state("🔮", "Paste model tracking link inside sidebar to initialize Forecast Matrix engines.")
@@ -647,7 +647,9 @@ with tab2:
         
         # Forecast Model Plots
         fig_fc.add_trace(go.Scatter(x=f_dates, y=f_prices, name="Forecast Window Matrix", line=dict(color=BLUE, width=2, dash="dot"), mode="lines+markers"))
-        fig_fc.update_layout(**base_layout(440, "Dynamic Multi-Step Simulation Curve Plots"), yaxis=dict(tickprefix="$"))
+        
+        # FIX: Passed override_yaxis inside base_layout parameters directly to prevent duplication crash
+        fig_fc.update_layout(**base_layout(440, "Dynamic Multi-Step Simulation Curve Plots", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig_fc, use_container_width=True)
 
         with st.expander("📋 View full forecast table"):

@@ -1,6 +1,6 @@
 # ============================================================
 # TSLA FORECASTING HUB  |  app.py
-# Model: Dynamic Iterative Roll (CNN-GRU + Prophet + SARIMAX)
+# Model: Multi-Engine Iterative Additive Seasonality & Residual Bridge
 # ============================================================
 
 import os
@@ -264,10 +264,10 @@ def load_model_cached(file_id: str):
 
     return model
 
-def extract_iterative_statistical_trend(history_series: pd.Series, target_dates: pd.DatetimeIndex) -> np.ndarray:
+def extract_additive_components(history_series: pd.Series, target_dates: pd.DatetimeIndex) -> np.ndarray:
     """
-    Fits Prophet and SARIMAX over the current rolling historical context frame
-    to extract true step deviations, entirely crushing model flatlining/decay.
+    Decomposes history with Prophet (to extract macro seasonality patterns) 
+    and captures localized error/autoregressive adjustments via SARIMAX.
     """
     try:
         from prophet import Prophet
@@ -278,29 +278,33 @@ def extract_iterative_statistical_trend(history_series: pd.Series, target_dates:
     if len(target_dates) == 0:
         return np.zeros(0)
 
-    # 1. Fit Prophet Layer
+    # 1. Prophet: Decompose macro seasonality and hidden waves
     pdf = history_series.reset_index()
     pdf.columns = ["ds", "y"]
-    m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
+    m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
     m_prophet.fit(pdf)
     future = pd.DataFrame({"ds": target_dates})
-    p_out = m_prophet.predict(future)["yhat"].values - history_series.iloc[-1]
+    forecast_prophet = m_prophet.predict(future)
+    
+    # Isolate true seasonal/pattern component fluctuations relative to the anchor terminal close
+    prophet_pattern = forecast_prophet["yhat"].values - history_series.iloc[-1]
 
-    # 2. Fit SARIMAX Layer
+    # 2. SARIMAX: Model tracking error changes and high frequency autoregressive steps
     try:
         sarimax_mod = SARIMAX(history_series.values, order=(1,1,1), seasonal_order=(1,0,0,5))
         s_res = sarimax_mod.fit(disp=False)
-        s_out = s_res.forecast(steps=len(target_dates)) - history_series.iloc[-1]
+        sarimax_error_seasonality = s_res.forecast(steps=len(target_dates)) - history_series.iloc[-1]
     except Exception:
-        s_out = p_out
+        sarimax_error_seasonality = prophet_pattern
 
-    return (0.50 * p_out) + (0.50 * s_out)
+    # Blend components linearly to provide structural error limits + multi-season adjustments
+    return (0.55 * prophet_pattern) + (0.45 * sarimax_error_seasonality)
 
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     """
-    Anti-Decay Recursive Rolling Strategy Engine.
-    Imputes known historical markers and projects future spaces via an updated trend loop.
+    Iterative Additive Structural Core. Imputes exact historical data markers,
+    calculates structural gaps, and injects seasonality + error levels sequentially.
     """
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -310,86 +314,100 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     daily_vol = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
 
     preds_prices = []
+    bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
     
-    # --- SCENARIO 1: STRATEGY BEGINS INSIDE OR BEFORE STABLE ACTUALS ---
+    # ─── SCENARIO 1: STARTING DATE LANDS INSIDE / BEFORE ACTUAL DATA MARKERS ───
     if target_start <= db_max_date:
-        for curr_date in biz_dates:
+        for idx, curr_date in enumerate(biz_dates):
             if curr_date <= db_max_date:
-                # Rule: Impute true, absolute actual historic data point
+                # Direct Ground Truth Imputation Override
                 preds_prices.append(float(df.loc[curr_date, "Adj Close"]))
             else:
-                # Step-Ahead Rolling Network Prediction Logic
+                # Multi-Step Sequence Rolling Window Prediction Loop
                 lookback_context = df[df.index < curr_date].tail(LOOKBACK)["Adj Close"].tolist()
                 
-                # Fill missing pieces with our own steps
+                # Dynamic backfill utilizing previous hybrid evaluations
                 idx_offset = len(preds_prices) - 1
-                step_back = 1
                 while len(lookback_context) < LOOKBACK and idx_offset >= 0:
                     lookback_context.insert(0, preds_prices[idx_offset])
                     idx_offset -= 1
                 
-                # Extract rolling trend adjustment to inject back into seed array
+                # Fetch fresh additive parameters based on trailing 1-year historical profile
                 hist_frame = df[df.index < curr_date].tail(252)["Adj Close"]
-                trend_adj = extract_iterative_statistical_trend(hist_frame, pd.DatetimeIndex([curr_date]))[0]
+                additive_structural_delta = extract_additive_components(hist_frame, pd.DatetimeIndex([curr_date]))[0]
 
                 x_scaled = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
                 x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
                 
                 raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
-                preds_prices.append(raw_pred + (trend_adj * 0.70))
+                
+                # Reinject combined patterns, levels of seasonality, and error metrics back into sequence loop
+                preds_prices.append(raw_pred + (additive_structural_delta * 0.75))
 
-    # --- SCENARIO 2: STRATEGY BEGINS IN THE FAR FUTURE (e.g., 2032) ---
+    # ─── SCENARIO 2: STARTING DATE LANDS IN FAR FUTURE (Explicit Bridge Required) ───
     else:
-        # Build rolling dynamic synthetic continuation dataframe up to target start point
         working_df = df[["Adj Close"]].copy()
-        current_gap_start = db_max_date + pd.Timedelta(days=1)
+        gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
         
-        while current_gap_start < target_start:
-            chunk_end = min(current_gap_start + pd.Timedelta(days=60), target_start - pd.Timedelta(days=1))
-            gap_chunk_dates = pd.bdate_range(start=current_gap_start, end=chunk_end)
-            
-            if len(gap_chunk_dates) == 0:
-                break
+        # 1. Fill implicit layout gaps using an iterative blocks framework
+        if len(gap_range) > 0:
+            current_gap_ptr = gap_range[0]
+            while current_gap_ptr <= gap_range[-1]:
+                chunk_end = min(current_gap_ptr + pd.Timedelta(days=60), gap_range[-1])
+                chunk_dates = pd.bdate_range(start=current_gap_ptr, end=chunk_end)
                 
-            chunk_trends = extract_iterative_statistical_trend(working_df.tail(252)["Adj Close"], gap_chunk_dates)
-            
-            chunk_preds = []
-            for idx, g_date in enumerate(gap_chunk_dates):
-                seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
-                x_scaled = scaler.transform(np.array(seed_vals).reshape(-1, 1)).flatten()
-                x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
+                if len(chunk_dates) == 0:
+                    break
+                    
+                chunk_additive_signals = extract_additive_components(working_df.tail(252)["Adj Close"], chunk_dates)
                 
-                raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
-                adjusted_pred = raw_pred + (chunk_trends[idx] * 0.70)
-                chunk_preds.append(adjusted_pred)
-                
-                # Commit steps to prevent input decay flatlining
-                working_df.loc[g_date, "Adj Close"] = adjusted_pred
-                
-            current_gap_start = chunk_end + pd.Timedelta(days=1)
+                for idx, g_date in enumerate(chunk_dates):
+                    seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
+                    x_scaled = scaler.transform(np.array(seed_vals).reshape(-1, 1)).flatten()
+                    x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
+                    
+                    raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
+                    final_bridged_val = raw_pred + (chunk_additive_signals[idx] * 0.75)
+                    
+                    working_df.loc[g_date, "Adj Close"] = final_bridged_val
+                    
+                    # Log to output matrices to restore physical visualization trail
+                    bridge_dates.append(g_date)
+                    bridge_prices.append(final_bridged_val)
+                    
+                    b_step = len(bridge_prices)
+                    band_frac = np.clip(daily_vol * np.sqrt(b_step), 0, 0.45)
+                    bridge_lo.append(final_bridged_val * (1 - band_frac))
+                    bridge_hi.append(final_bridged_val * (1 + band_frac))
+                    
+                current_gap_ptr = chunk_end + pd.Timedelta(days=1)
 
-        # Generate target window predictions using the updated, trend-corrected baseline
-        final_trends = extract_iterative_statistical_trend(working_df.tail(252)["Adj Close"], biz_dates)
+        # 2. Extract and project the target forecast window out from the reconstructed boundary
+        target_additive_signals = extract_additive_components(working_df.tail(252)["Adj Close"], biz_dates)
         for idx, b_date in enumerate(biz_dates):
             seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
             x_scaled = scaler.transform(np.array(seed_vals).reshape(-1, 1)).flatten()
             x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
             
             raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
-            adjusted_pred = raw_pred + (final_trends[idx] * 0.70)
-            preds_prices.append(adjusted_pred)
-            working_df.loc[b_date, "Adj Close"] = adjusted_pred
+            final_target_val = raw_pred + (target_additive_signals[idx] * 0.75)
+            
+            preds_prices.append(final_target_val)
+            working_df.loc[b_date, "Adj Close"] = final_target_val
 
-    # Compute variance confidence rails safely
+    # Structure absolute calculation metrics across variation bounds
     preds_prices = np.array(preds_prices, dtype=np.float32)
     lower_bounds, upper_bounds = [], []
+    
+    bridge_steps_count = len(bridge_prices)
     for idx in range(len(preds_prices)):
-        band_frac = np.clip(daily_vol * np.sqrt(idx + 1), 0, 0.45)
+        total_depth_index = bridge_steps_count + idx + 1
+        band_frac = np.clip(daily_vol * np.sqrt(total_depth_index), 0, 0.45)
         lower_bounds.append(preds_prices[idx] * (1 - band_frac))
         upper_bounds.append(preds_prices[idx] * (1 + band_frac))
 
     return (biz_dates, preds_prices, np.array(lower_bounds), np.array(upper_bounds),
-            pd.DatetimeIndex([]), np.array([]), np.array([]), np.array([]))
+            pd.DatetimeIndex(bridge_dates), np.array(bridge_prices), np.array(bridge_lo), np.array(bridge_hi))
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║                    LOAD INITIALIZER                      ║

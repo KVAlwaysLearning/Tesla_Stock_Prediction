@@ -326,13 +326,16 @@ def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metri
 # MODULE 20: INTERACTIVE PLOTLY DARK MESH SYNTHESIS COMPONENT
 def base_layout(height: int = 350, title: str = "", override_yaxis=None) -> dict:
     layout = dict(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(10,14,24,0.45)",
-        font_color=FONT_COL, height=height,
+        paper_bgcolor="rgba(0,0,0,0)", 
+        plot_bgcolor="rgba(10,14,24,0.45)",
+        font_color=FONT_COL, 
+        height=height,
         margin=dict(l=45, r=20, t=45, b=35),
         title=dict(text=title, font=dict(size=11, color=MUTED, family="Space Grotesk")),
         xaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL, zeroline=False),
         yaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL, zeroline=False),
     )
+    # Safely merge yaxis overrides into the native yaxis property dictionary
     if override_yaxis is not None:
         layout["yaxis"].update(override_yaxis)
     return layout
@@ -626,7 +629,7 @@ with t2:
         if b_dates:
             fig5.add_trace(go.Scatter(x=b_dates, y=b_hi, line=dict(width=0), showlegend=False))
             fig5.add_trace(go.Scatter(x=b_dates, y=b_lo, line=dict(width=0), fill='tonexty', fillcolor='rgba(255,204,0,0.04)', name='Confidence Band (95%)'))
-        fig5.update_layout(**base_layout(400, "Hybrid Predictor Pipeline Forward Projection Mapping Node"), override_yaxis=dict(tickprefix="$"))
+        fig5.update_layout(**base_layout(400, "Hybrid Predictor Pipeline Forward Projection Mapping Node", override_yaxis=dict(tickprefix="$")))
         st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
         st.plotly_chart(fig5, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)

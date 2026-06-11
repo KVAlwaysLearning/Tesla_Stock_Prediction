@@ -1,13 +1,13 @@
 # ============================================================
-# TSLA FORECASTING HUB  |  app.py
+# TSLA FORECASTING HUB  |  app_08.py
 # Model: CNN-GRU + Hurst Regime Detection + OU Mean-Reversion
-# Full Engineering Overhaul: 25 Unique ReactBits-Inspired Components
 # ============================================================
 
 import os
 import re
 import warnings
 import tempfile
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -16,7 +16,6 @@ import streamlit as st
 
 warnings.filterwarnings("ignore")
 
-# Safe retrieval for environmental secrets
 secret_url = ""
 try:
     if "model_config" in st.secrets and "gdrive_model_link" in st.secrets["model_config"]:
@@ -27,7 +26,7 @@ except Exception:
 def get_secret_model_link() -> str:
     return secret_url
 
-# ── MODULE 19: ULTRA-WIDE CYBERNETIC DASH LAYOUT INITIALIZATION ──
+# ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="TSLA Hybrid Forecast Hub",
     page_icon="⚡",
@@ -35,269 +34,420 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ╔══════════════════════════════════════════════════════════╗
-# ║        REACTBITS 25-MODULE FULL INJECTION ENGINE         ║
-# ╚══════════════════════════════════════════════════════════╝
+# ── Futuristic Theme — ReactBits-inspired animations ─────────
 st.markdown("""
 <style>
-/* MODULE 13: JETBRAINS MONO CODE BLUEPRINT TYPOGRAPHY */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-/* MODULE 14: SPACE GROTESK VARIABLE GEOMETRY DISPLAY TYPOGRAPHY */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+/* ═══════════════════════════════════════════════
+   FONTS & BASE SYSTEM
+═══════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* ═══════════════════════════════════════════════
+   AURORA BACKGROUND WAVE (reactbits: Aurora)
+   Slow-orbiting dual plasma blobs with fluid opacity
+═══════════════════════════════════════════════ */
+@keyframes aurora-drift-a {
+  0%   { transform: translate(0%,   0%)   scale(1);    opacity: 0.60; }
+  33%  { transform: translate(12%,  -15%)  scale(1.22); opacity: 0.40; }
+  66%  { transform: translate(-10%,  12%)  scale(0.90); opacity: 0.70; }
+  100% { transform: translate(0%,   0%)   scale(1);    opacity: 0.60; }
+}
+@keyframes aurora-drift-b {
+  0%   { transform: translate(0%,  0%)   scale(1);    opacity: 0.45; }
+  40%  { transform: translate(-12%, 18%)  scale(1.15); opacity: 0.55; }
+  75%  { transform: translate(10%, -10%)   scale(0.95); opacity: 0.30; }
+  100% { transform: translate(0%,  0%)   scale(1);    opacity: 0.45; }
+}
+
 .stApp {
-  background-color: #05070c !important;
-  color: #e2eaf5 !important;
+  background-color: #06080e !important;
+  color: #e2e8f5 !important;
   font-family: 'Inter', sans-serif !important;
   overflow-x: hidden;
 }
 
-/* MODULE 11: AURORA FLOATING PLASMA NODES A & B ANIMATION ENGINE */
-@keyframes aurora-drift-primary {
-  0%   { transform: translate(0%,   0%)   scale(1);    opacity: 0.55; }
-  33%  { transform: translate(8%,  -10%)  scale(1.15); opacity: 0.35; }
-  66%  { transform: translate(-6%,  8%)   scale(0.95); opacity: 0.65; }
-  100% { transform: translate(0%,   0%)   scale(1);    opacity: 0.55; }
-}
-@keyframes aurora-drift-secondary {
-  0%   { transform: translate(0%,  0%)   scale(1);    opacity: 0.40; }
-  40%  { transform: translate(-8%, 12%)  scale(1.10); opacity: 0.50; }
-  75%  { transform: translate(6%, -6%)   scale(0.90); opacity: 0.25; }
-  100% { transform: translate(0%,  0%)   scale(1);    opacity: 0.40; }
-}
-
-/* MODULE 1: STRANDS CYBER BACKGROUND LINE MESH MATRIX */
+/* Beautiful fluid mesh behind all UI layers */
 .stApp::before {
-  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 70% 55% at 15% 20%, rgba(59,130,246,0.14) 0%, transparent 65%),
-    radial-gradient(ellipse 60% 70% at 85% 75%, rgba(147,51,234,0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(245,158,11,0.03) 0%, transparent 55%);
-  animation: aurora-drift-primary 22s ease-in-out infinite;
+    radial-gradient(ellipse 75% 60% at 10% 25%, rgba(65,105,225,0.16) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 75% at 90% 70%, rgba(147,51,234,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 45%, rgba(245,158,11,0.05) 0%, transparent 55%);
+  animation: aurora-drift-a 22s ease-in-out infinite;
 }
 .stApp::after {
-  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 45% at 80% 20%, rgba(16,185,129,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 20% 80%, rgba(59,130,246,0.08) 0%, transparent 55%);
-  animation: aurora-drift-secondary 26s ease-in-out infinite;
+    radial-gradient(ellipse 65% 50% at 80% 15%, rgba(16,185,129,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 65% at 20% 80%, rgba(59,130,246,0.10) 0%, transparent 55%);
+  animation: aurora-drift-b 28s ease-in-out infinite;
 }
 
-/* MODULE 3: DOTGRID MATRIX CANVAS PATTERN LAYERING */
+/* Futuristic Fine Dots Pattern Overlay (reactbits: DotGrid) */
 .stApp > div {
-  background-image: radial-gradient(circle, rgba(255,255,255,0.022) 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
   position: relative; z-index: 1;
 }
 
-/* MODULE 18: CUSTOM OVERFLOW SIDEBAR FORCE-SCROLL ENGINE */
+/* ═══════════════════════════════════════════════
+   CRITICAL SCROLLING FIX FOR THE SIDEBAR
+═══════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-  background: rgba(6, 8, 14, 0.97) !important;
-  border-right: 1px solid rgba(59,130,246,0.20) !important;
+  background: rgba(8, 10, 16, 0.94) !important;
+  border-right: 1px solid rgba(59,130,246,0.18) !important;
   backdrop-filter: blur(24px) !important;
   -webkit-backdrop-filter: blur(24px) !important;
 }
-[data-testid="stSidebarContent"], [data-testid="stSidebarUserContent"], section[data-testid="stSidebar"] > div {
-  overflow-y: auto !important; max-height: 100vh !important;
-}
-[data-testid="stSidebarContent"]::-webkit-scrollbar { width: 5px; }
-[data-testid="stSidebarContent"]::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
-[data-testid="stSidebarContent"]::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.2); border-radius: 4px; }
 
-/* MODULE 8: STAGGERED ANIMATED MENUS SIDE PANEL TRANSITION */
-[data-testid="stSidebar"] .element-container {
-  animation: sidebarMenuSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes sidebarMenuSlideIn {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
+[data-testid="stSidebarContent"], 
+[data-testid="stSidebarUserContent"], 
+section[data-testid="stSidebar"] > div {
+  overflow-y: auto !important;
+  max-height: 100vh !important;
 }
 
-/* MODULE 17: NEON MATRIX COLOR PALETTES (PREMIUM NAVIGATION TABS) */
+[data-testid="stSidebarContent"]::-webkit-scrollbar {
+  width: 5px;
+}
+[data-testid="stSidebarContent"]::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+}
+[data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
+  background: rgba(59,130,246,0.22);
+  border-radius: 4px;
+}
+[data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
+  background: rgba(59,130,246,0.45);
+}
+
+/* ═══════════════════════════════════════════════
+   TABS STYLE (Premium animated state)
+═══════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
   gap: 8px !important;
-  background: rgba(7,9,15,0.90) !important;
-  border-bottom: 1px solid rgba(59,130,246,0.25) !important;
-  backdrop-filter: blur(16px);
-  padding: 6px 16px 0 16px !important;
+  background: rgba(8,10,18,0.70) !important;
+  border-bottom: 1px solid rgba(59,130,246,0.15) !important;
+  backdrop-filter: blur(12px);
+  padding: 4px 12px 0 12px !important;
   border-radius: 12px 12px 0 0;
 }
 .stTabs [data-baseweb="tab"] {
-  background: transparent !important; color: rgba(148,163,184,0.60) !important;
-  font-family: 'Space Grotesk', sans-serif !important; font-weight: 600 !important;
-  font-size: 0.82rem !important; letter-spacing: 0.10em !important; text-transform: uppercase !important;
-  padding: 12px 24px !important; border: none !important; border-bottom: 2px solid transparent !important;
-  transition: all 0.25s ease !important;
+  background: transparent !important;
+  color: rgba(148,163,184,0.7) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.10em !important;
+  text-transform: uppercase !important;
+  padding: 12px 24px !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  transition: color 0.3s ease, border-color 0.3s ease !important;
 }
-.stTabs [data-baseweb="tab"]:hover { color: #ffaa00 !important; }
+.stTabs [data-baseweb="tab"]:hover {
+  color: #ffaa11 !important;
+}
 .stTabs [aria-selected="true"] {
-  color: #ffcc00 !important; border-bottom: 2px solid #ffcc00 !important;
+  color: #ffcc00 !important;
+  border-bottom: 2px solid #ffcc00 !important;
   background: rgba(255, 204, 0, 0.04) !important;
   text-shadow: 0 0 12px rgba(255, 204, 0, 0.30);
 }
 
-/* MODULE 2: SHINYTEXT LEFT-TO-RIGHT SHIMMER GRADIENT */
-@keyframes shinyTextSweep {
+/* ═══════════════════════════════════════════════
+   SHINY TEXT GRADIENTS (reactbits: ShinyText)
+═══════════════════════════════════════════════ */
+@keyframes shiny-glow {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
 }
 .shiny-text {
-  background: linear-gradient(120deg, #ffffff 20%, #ffcc00 50%, #ffffff 80%);
+  background: linear-gradient(120deg, #e2e8f0 25%, #ffcc00 50%, #e2e8f0 75%);
   background-size: 200% auto;
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  animation: shinyTextSweep 4.0s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shiny-glow 4s linear infinite;
   font-weight: 700;
 }
 
-/* MODULE 7: SPOTLIGHT GLOWING SHIMMER CARD FRAMEWERK */
-@keyframes cardShimmer {
+/* ═══════════════════════════════════════════════
+   METRIC CARDS (reactbits: Spotlight / Shimmer Card)
+═══════════════════════════════════════════════ */
+@keyframes shimmer-sweep {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
 }
 .metric-card {
-  position: relative; background: rgba(10,13,23,0.85) !important;
-  border: 1px solid rgba(59,130,246,0.22) !important; border-radius: 14px !important;
-  padding: 18px 16px !important; text-align: center; min-height: 110px;
-  backdrop-filter: blur(20px); overflow: hidden;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.25s ease;
+  position: relative;
+  background: rgba(12,16,28,0.80) !important;
+  border: 1px solid rgba(59,130,246,0.18) !important;
+  border-radius: 12px !important;
+  padding: 18px 16px !important;
+  text-align: center;
+  min-height: 100px;
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
-/* MODULE 9: GLARE HOVER OVERLAY INTEGRATION */
 .metric-card::before {
-  content: ""; position: absolute; inset: 0; border-radius: 14px;
-  background: linear-gradient(115deg, transparent 35%, rgba(59,130,246,0.12) 50%, transparent 65%);
-  background-size: 200% 100%; animation: cardShimmer 5.0s linear infinite; pointer-events: none;
+  content: "";
+  position: absolute; inset: 0; border-radius: 12px;
+  background: linear-gradient(105deg,
+    transparent 35%,
+    rgba(59,130,246,0.08) 50%,
+    transparent 65%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 4s linear infinite;
+  pointer-events: none;
 }
 .metric-card:hover {
-  border-color: rgba(59,130,246,0.60) !important;
-  box-shadow: 0 8px 25px rgba(59,130,246,0.25);
+  border-color: rgba(59,130,246,0.45) !important;
+  box-shadow: 0 8px 24px rgba(59,130,246,0.15);
   transform: translateY(-2px);
 }
 .metric-label {
-  color: #94a3b8; font-size: 0.72rem; letter-spacing: 0.12em;
-  text-transform: uppercase; margin-bottom: 6px; font-family: 'Space Grotesk', sans-serif;
+  color: #94a3b8;
+  font-size: 0.70rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
 }
 .metric-value {
-  color: #ffffff; font-size: 1.55rem; font-weight: 700;
-  font-family: 'JetBrains Mono', monospace; text-shadow: 0 0 15px rgba(59,130,246,0.20);
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-all;
+  text-shadow: 0 0 15px rgba(59,130,246,0.20);
 }
-
-/* MODULE 10: SPLASH GLOWING PULSE RING SIGNUM BADGES */
-@keyframes signumBuy {
-  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.50), 0 0 12px rgba(16,185,129,0.20); }
-  70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0), 0 0 25px rgba(16,185,129,0.10); }
-  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0), 0 0 12px rgba(16,185,129,0.20); }
-}
-@keyframes signumSell {
-  0%   { box-shadow: 0 0 0 0 rgba(244,63,94,0.50), 0 0 12px rgba(244,63,94,0.20); }
-  70%  { box-shadow: 0 0 0 10px rgba(244,63,94,0), 0 0 25px rgba(244,63,94,0.10); }
-  100% { box-shadow: 0 0 0 0 rgba(244,63,94,0), 0 0 12px rgba(244,63,94,0.20); }
-}
-@keyframes signumHold {
-  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.50), 0 0 12px rgba(245,158,11,0.20); }
-  70%  { box-shadow: 0 0 0 10px rgba(245,158,11,0), 0 0 25px rgba(245,158,11,0.10); }
-  100% { box-shadow: 0 0 0 0 rgba(245,158,11,0), 0 0 12px rgba(245,158,11,0.20); }
-}
-.signal-buy {
-  background: rgba(16,185,129,0.12) !important; color: #10b981 !important;
-  border: 2px solid rgba(16,185,129,0.70) !important; border-radius: 8px !important;
-  padding: 10px 32px !important; font-weight: 700 !important; font-size: 1.55rem !important;
-  font-family: 'Space Grotesk', monospace !important; letter-spacing: 0.08em;
-  display: inline-block !important; animation: signumBuy 2.2s infinite !important;
-}
-.signal-sell {
-  background: rgba(244,63,94,0.12) !important; color: #f43f5e !important;
-  border: 2px solid rgba(244,63,94,0.70) !important; border-radius: 8px !important;
-  padding: 10px 32px !important; font-weight: 700 !important; font-size: 1.55rem !important;
-  font-family: 'Space Grotesk', monospace !important; letter-spacing: 0.08em;
-  display: inline-block !important; animation: signumSell 2.2s infinite !important;
-}
-.signal-hold {
-  background: rgba(245,158,11,0.12) !important; color: #f59e0b !important;
-  border: 2px solid rgba(245,158,11,0.70) !important; border-radius: 8px !important;
-  padding: 10px 32px !important; font-weight: 700 !important; font-size: 1.55rem !important;
-  font-family: 'Space Grotesk', monospace !important; letter-spacing: 0.08em;
-  display: inline-block !important; animation: signumHold 2.2s infinite !important;
-}
-
-.metric-delta-up   { color: #10b981; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
-.metric-delta-down { color: #f43f5e; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+.metric-delta-up   { color: #10b981; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-weight: 500;}
+.metric-delta-down { color: #f43f5e; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-weight: 500;}
 .metric-muted      { color: #64748b; font-size: 0.82rem; margin-top: 4px; }
 
-/* MODULE 15: SCANNING LIGHT BAR COMPONENT HEADERS */
-@keyframes barScanEngine {
+/* ═══════════════════════════════════════════════
+   PULSING SIGNAL BADGE
+═══════════════════════════════════════════════ */
+@keyframes ring-buy {
+  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.5), 0 0 15px rgba(16,185,129,0.2); }
+  70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0), 0 0 25px rgba(16,185,129,0.1); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0), 0 0 15px rgba(16,185,129,0.2); }
+}
+@keyframes ring-sell {
+  0%   { box-shadow: 0 0 0 0 rgba(244,63,94,0.5), 0 0 15px rgba(244,63,94,0.2); }
+  70%  { box-shadow: 0 0 0 10px rgba(244,63,94,0), 0 0 25px rgba(244,63,94,0.1); }
+  100% { box-shadow: 0 0 0 0 rgba(244,63,94,0), 0 0 15px rgba(244,63,94,0.2); }
+}
+@keyframes ring-hold {
+  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.5), 0 0 15px rgba(245,158,11,0.2); }
+  70%  { box-shadow: 0 0 0 10px rgba(245,158,11,0), 0 0 25px rgba(245,158,11,0.1); }
+  100% { box-shadow: 0 0 0 0 rgba(245,158,11,0), 0 0 15px rgba(245,158,11,0.2); }
+}
+.signal-buy {
+  background: rgba(16,185,129,0.1) !important;
+  color: #10b981 !important;
+  border: 2px solid rgba(16,185,129,0.7) !important;
+  border-radius: 8px !important;
+  padding: 10px 32px !important;
+  font-weight: 700 !important;
+  font-size: 1.6rem !important;
+  font-family: 'Space Grotesk', monospace !important;
+  letter-spacing: 0.1em !important;
+  display: inline-block !important;
+  animation: ring-buy 2s infinite !important;
+}
+.signal-sell {
+  background: rgba(244,63,94,0.1) !important;
+  color: #f43f5e !important;
+  border: 2px solid rgba(244,63,94,0.7) !important;
+  border-radius: 8px !important;
+  padding: 10px 32px !important;
+  font-weight: 700 !important;
+  font-size: 1.6rem !important;
+  font-family: 'Space Grotesk', monospace !important;
+  letter-spacing: 0.1em !important;
+  display: inline-block !important;
+  animation: ring-sell 2s infinite !important;
+}
+.signal-hold {
+  background: rgba(245,158,11,0.1) !important;
+  color: #f59e0b !important;
+  border: 2px solid rgba(245,158,11,0.7) !important;
+  border-radius: 8px !important;
+  padding: 10px 32px !important;
+  font-weight: 700 !important;
+  font-size: 1.6rem !important;
+  font-family: 'Space Grotesk', monospace !important;
+  letter-spacing: 0.1em !important;
+  display: inline-block !important;
+  animation: ring-hold 2s infinite !important;
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION HEADERS
+═══════════════════════════════════════════════ */
+@keyframes scanning-glow {
   0%   { left: -100%; }
-  100% { left:  130%; }
+  100% { left:  120%; }
 }
 .section-header {
-  position: relative; color: #ffcc00; font-size: 0.76rem; letter-spacing: 0.18em;
-  text-transform: uppercase; margin-top: 24px; margin-bottom: 12px;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 600; padding-bottom: 6px; overflow: hidden;
+  position: relative;
+  color: #ffcc00;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  overflow: hidden;
+  padding-bottom: 6px;
 }
 .section-header::after {
-  content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
   background: linear-gradient(90deg, transparent, rgba(59,130,246,0.3), transparent);
 }
 .section-header::before {
-  content: ""; position: absolute; bottom: 0; width: 35%; height: 1px;
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 35%;
+  height: 1px;
   background: linear-gradient(90deg, transparent, #ffcc00, transparent);
-  animation: barScanEngine 4.0s linear infinite;
+  animation: scanning-glow 4s linear infinite;
 }
 
-/* MODULE 4: FLUID GLASS BORDER GLOW CONTAINER MODULE */
-.chart-wrap {
-  position: relative; border: 1px solid rgba(59,130,246,0.18); border-radius: 12px;
-  overflow: hidden; background: rgba(6,9,16,0.55); padding: 8px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease; margin-bottom: 14px;
+/* ═══════════════════════════════════════════════
+   HEADER HERO STRIP
+═══════════════════════════════════════════════ */
+@keyframes border-sweep {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
-.chart-wrap:hover { 
-  border-color: rgba(59,130,246,0.40); box-shadow: 0 5px 18px rgba(59,130,246,0.08);
+.app-header-banner {
+  position: relative;
+  background: rgba(10,14,26,0.72);
+  border: 1px solid rgba(59,130,246,0.22);
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+.app-header-banner::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.7), #ffcc00, transparent);
+  background-size: 200% auto;
+  animation: border-sweep 6s linear infinite;
+}
+.app-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.app-subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.70rem;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
 }
 
-/* MODULE 16: DYNAMIC MACRO TELEMETRY INDICATOR TOGGLE ROWS */
+/* ═══════════════════════════════════════════════
+   INDICATOR COMPONENT
+═══════════════════════════════════════════════ */
 .indicator-row {
-  display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 8px;
-  border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
-  font-size: 0.82rem; color: #e2e8f5; transition: all 0.2s ease;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.03);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
 .indicator-row:hover {
-  background: rgba(59,130,246,0.07); border-color: rgba(59,130,246,0.22); transform: translateX(2px);
+  background: rgba(59,130,246,0.05);
+  border-color: rgba(59,130,246,0.15);
 }
-.ind-icon { font-size: 0.90rem; flex-shrink: 0; }
+.ind-icon { font-size: 0.9rem; flex-shrink: 0; }
 .ind-name { font-weight: 500; flex: 1; }
 .ind-badge {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.05em;
-  padding: 3px 10px; border-radius: 5px; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-weight: 600;
 }
-.badge-bull { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
-.badge-bear { background: rgba(244,63,94,0.15);  color: #f43f5e; border: 1px solid rgba(244,63,94,0.25); }
-.badge-neut { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.22); }
-.badge-warn { background: rgba(244,63,94,0.20);  color: #ffa5b5; border: 1px solid rgba(244,63,94,0.30); }
+.badge-bull { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+.badge-bear { background: rgba(244,63,94,0.12);  color: #f43f5e; border: 1px solid rgba(244,63,94,0.25); }
+.badge-neut { background: rgba(245,158,11,0.10); color: #f59e0b; border: 1px solid rgba(245,158,11,0.20); }
+.badge-warn { background: rgba(244,63,94,0.18);  color: #ffa5b5; border: 1px solid rgba(244,63,94,0.30); }
 
-/* MODULE 6: SCROLL VELOCITY ENGINE MOMENTUM CONTROLS (BUTTONS) */
+/* ═══════════════════════════════════════════════
+   CHART DECORATION CONTAINER
+═══════════════════════════════════════════════ */
+.chart-wrap {
+  position: relative;
+  border: 1px solid rgba(59,130,246,0.16);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(8,10,18,0.40);
+  padding: 6px;
+  transition: border-color 0.3s ease;
+}
+.chart-wrap:hover { border-color: rgba(59,130,246,0.35); }
+
 .stButton > button {
-  background: linear-gradient(135deg, #09122b 0%, #12214d 100%) !important;
-  border: 1px solid rgba(59,130,246,0.40) !important; color: #60a5fa !important;
-  border-radius: 8px !important; padding: 10px 24px !important;
-  font-family: 'Space Grotesk', sans-serif !important; font-weight: 600 !important;
-  font-size: 0.82rem !important; letter-spacing: 0.08em !important; text-transform: uppercase !important;
-  transition: all 0.25s ease !important; width: 100%;
+  background: linear-gradient(135deg, #0b1530 0%, #152554 100%) !important;
+  border: 1px solid rgba(59,130,246,0.40) !important;
+  color: #60a5fa !important;
+  border-radius: 8px !important;
+  padding: 10px 24px !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.80rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  width: 100%;
 }
 .stButton > button:hover {
-  border-color: rgba(59,130,246,0.85) !important; box-shadow: 0 4px 15px rgba(59,130,246,0.3) !important;
-  color: #93c5fd !important; transform: translateY(-1px);
+  border-color: rgba(59,130,246,0.80) !important;
+  box-shadow: 0 4px 15px rgba(59,130,246,0.3) !important;
+  color: #93c5fd !important;
 }
+
+hr { border-color: rgba(59,130,246,0.12) !important; }
+#MainMenu, footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                   DATA CORE CONFIG                       ║
+# ║                    CONSTANTS                             ║
 # ╚══════════════════════════════════════════════════════════╝
+
 CSV_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TSLA_1.csv")
 LOOKBACK  = 60
-GRID_COL  = "#161f30"
+PLOT_BG   = "#080a10"
+GRID_COL  = "#1a2135"
 FONT_COL  = "#e2e8f5"
 ACCENT    = "#ffcc00"
 GREEN     = "#10b981"
@@ -306,6 +456,10 @@ BLUE      = "#3b82f6"
 PURPLE    = "#a855f7"
 MUTED     = "#64748b"
 
+# ╔══════════════════════════════════════════════════════════╗
+# ║                    HELPERS                               ║
+# ╚══════════════════════════════════════════════════════════╝
+
 def safe_float(val, fallback=0.0) -> float:
     try:
         v = float(val)
@@ -313,7 +467,16 @@ def safe_float(val, fallback=0.0) -> float:
     except Exception:
         return fallback
 
-# MODULE 5: COUNTUP NUMERIC TICK VALUE LOADER OVERLAY
+def empty_state(icon: str, msg: str):
+    st.markdown(
+        f'<div style="background: rgba(12,16,28,0.52); border: 1px dashed rgba(59,130,246,0.20); '
+        f'border-radius: 12px; padding: 48px; text-align: center; color: #64748b; backdrop-filter: blur(8px);">'
+        f'<div style="font-size: 2.5rem; margin-bottom: 12px;">{icon}</div>'
+        f'<div style="font-size: 0.90rem; max-width: 420px; margin: 0 auto; line-height: 1.6;">{msg}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
 def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metric-muted") -> str:
     return (
         f'<div class="metric-card">'
@@ -323,22 +486,22 @@ def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metri
         f'</div>'
     )
 
-# MODULE 20: INTERACTIVE PLOTLY DARK MESH SYNTHESIS COMPONENT
 def base_layout(height: int = 350, title: str = "", override_yaxis=None) -> dict:
     layout = dict(
-        paper_bgcolor="rgba(0,0,0,0)", 
-        plot_bgcolor="rgba(10,14,24,0.45)",
-        font_color=FONT_COL, 
-        height=height,
-        margin=dict(l=45, r=20, t=45, b=35),
-        title=dict(text=title, font=dict(size=11, color=MUTED, family="Space Grotesk")),
-        xaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL, zeroline=False),
-        yaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL, zeroline=False),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)",
+        font_color=FONT_COL, height=height,
+        margin=dict(l=40, r=20, t=40, b=30),
+        title=dict(text=title, font=dict(size=12, color=MUTED, family="Space Grotesk")),
+        xaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL),
+        yaxis=dict(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL),
     )
-    # Safely merge yaxis overrides into the native yaxis property dictionary
     if override_yaxis is not None:
         layout["yaxis"].update(override_yaxis)
     return layout
+
+# ╔══════════════════════════════════════════════════════════╗
+# ║                    DATA LAYER                            ║
+# ╚══════════════════════════════════════════════════════════╝
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, list[str]]:
@@ -350,38 +513,61 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
         except Exception as e:
-            warnings_out.append(f"Inversion read parameter fail: {e}")
+            warnings_out.append(f"Could not read TSLA_1.csv: {e}")
     else:
-        warnings_out.append("TSLA_1.csv not found. Re-routing initialization to safe generative data space models.")
+        warnings_out.append("TSLA_1.csv unified dataset not found. Initializing historical simulation data automatically.")
         np.random.seed(42)
         base_price = 220.0
-        biz_dates = pd.bdate_range(start=pd.Timestamp("2025-06-11"), periods=252)
+        start_date = pd.Timestamp("2025-06-11")
+        biz_dates = pd.bdate_range(start=start_date, periods=252)
+        
         prices = [base_price]
         current = base_price
+        drift = 0.0006
+        volatility = 0.022
+        
         for _ in range(1, len(biz_dates)):
-            current = max(current * np.exp(0.0005 + 0.022 * np.random.normal()), 10.0)
+            daily_return = drift + volatility * np.random.normal()
+            current = max(current * np.exp(daily_return), 15.0)
             prices.append(current)
+            
         prices = np.array(prices)
-        opens = prices * (1.0 + (np.random.rand(len(biz_dates)) - 0.5) * 0.012)
-        spreads = prices * (0.01 + np.random.rand(len(biz_dates)) * 0.03)
+        opens = prices * (1.0 + (np.random.rand(len(biz_dates)) - 0.5) * 0.015)
+        spreads = prices * (0.01 + np.random.rand(len(biz_dates)) * 0.04)
+        highs = np.maximum(opens, prices) + spreads * 0.35
+        lows = np.minimum(opens, prices) - spreads * 0.65
+        volumes = (12 + np.random.rand(len(biz_dates)) * 26) * 1000000
+        
         df = pd.DataFrame({
-            "Open": opens, "High": np.maximum(opens, prices) + spreads*0.4,
-            "Low": np.minimum(opens, prices) - spreads*0.6, "Close": prices,
-            "Adj Close": prices, "Volume": (15 + np.random.rand(len(biz_dates))*20)*1000000
+            "Open": opens,
+            "High": highs,
+            "Low": lows,
+            "Close": prices,
+            "Adj Close": prices,
+            "Volume": volumes.astype(int)
         }, index=biz_dates)
         df.index.name = "Date"
 
+    required = {"Open", "High", "Low", "Close", "Volume"}
+    missing  = required - set(df.columns)
+    if missing:
+        return pd.DataFrame(), [f"Dataset is missing columns: {', '.join(missing)}"]
+
+    if "Adj Close" not in df.columns:
+        df["Adj Close"] = df["Close"]
+
     df.ffill(inplace=True)
     df.bfill(inplace=True)
-    df["Spread"] = df["High"] - df["Low"]
-    df["MA30"] = df["Close"].rolling(30).mean()
-    df["MA90"] = df["Close"].rolling(90).mean()
-    df["MA200"] = df["Close"].rolling(200).mean()
-    df["EMA12"] = df["Close"].ewm(span=12, adjust=False).mean()
-    df["EMA26"] = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = df["EMA12"] - df["EMA26"]
-    df["MACDSig"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["MACDHist"] = df["MACD"] - df["MACDSig"]
+
+    df["Spread"]    = df["High"] - df["Low"]
+    df["MA30"]      = df["Close"].rolling(30).mean()
+    df["MA90"]      = df["Close"].rolling(90).mean()
+    df["MA200"]     = df["Close"].rolling(200).mean()
+    df["EMA12"]     = df["Close"].ewm(span=12, adjust=False).mean()
+    df["EMA26"]     = df["Close"].ewm(span=26, adjust=False).mean()
+    df["MACD"]      = df["EMA12"] - df["EMA26"]
+    df["MACDSig"]   = df["MACD"].ewm(span=9, adjust=False).mean()
+    df["MACDHist"]  = df["MACD"] - df["MACDSig"]
     df["DailyReturn"] = df["Close"].pct_change() * 100
 
     delta = df["Close"].diff()
@@ -394,309 +580,470 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     bb_std         = df["Close"].rolling(20).std()
     df["BB_Upper"] = df["BB_Mid"] + 2 * bb_std
     df["BB_Lower"] = df["BB_Mid"] - 2 * bb_std
+
     return df, warnings_out
 
 def build_scaler(df: pd.DataFrame):
     from sklearn.preprocessing import MinMaxScaler
     scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler.fit(df[["Adj Close"]].dropna().values)
+    adj_vals = df[["Adj Close"]].dropna().values
+    if len(adj_vals) == 0:
+        raise ValueError("No valid 'Adj Close' values to fit the scaler.")
+    scaler.fit(adj_vals)
     return scaler
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║        QUANT MATHEMATICAL ENGINE MATHEMATICS             ║
+# ║                    MODEL LAYER                           ║
 # ╚══════════════════════════════════════════════════════════╝
+
+def extract_gdrive_id(url: str) -> str | None:
+    url = url.strip()
+    for pattern in [
+        r"/file/d/([a-zA-Z0-9_-]{20,})",
+        r"[?&]id=([a-zA-Z0-9_-]{20,})",
+        r"/d/([a-zA-Z0-9_-]{20,})/",
+        r"^([a-zA-Z0-9_-]{20,})$",
+    ]:
+        m = re.search(pattern, url)
+        if m:
+            return m.group(1)
+    return None
+
+@st.cache_resource(show_spinner=False)
+def load_model_cached(file_id: str):
+    try: import gdown
+    except ImportError: raise RuntimeError("'gdown' is missing from requirements.txt.")
+    try: import tensorflow as tf
+    except ImportError: raise RuntimeError("'tensorflow' is missing from requirements.txt.")
+
+    download_url = f"https://drive.google.com/uc?id={file_id}"
+    tmp_path     = os.path.join(tempfile.gettempdir(), f"tsla_model_{file_id[:8]}.keras")
+
+    if not os.path.exists(tmp_path):
+        result = gdown.download(download_url, tmp_path, quiet=True)
+        if result is None or not os.path.exists(tmp_path):
+            raise RuntimeError("Download failed. Verify link share options.")
+
+    try:
+        model = tf.keras.models.load_model(tmp_path)
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise RuntimeError(f"Model load exception: {e}")
+
+    return model
+
+# ╔══════════════════════════════════════════════════════════╗
+# ║            HYBRID REVISION ENGINE                        ║
+# ╚══════════════════════════════════════════════════════════╝
+
 def _hurst_exponent(series: np.ndarray) -> float:
     n = len(series)
-    if n < 20: return 0.5
+    if n < 20:
+        return 0.5
     try:
-        lags = [2, 4, 8, 16, 32] if n >= 64 else [2, 4, 8]
+        lags   = [2, 4, 8, 16, 32] if n >= 64 else [2, 4, 8]
         rs_vals = []
         for lag in lags:
             chunks = [series[i:i+lag] for i in range(0, n - lag + 1, lag)]
-            if not chunks: continue
+            if not chunks:
+                continue
             rs_chunk = []
             for c in chunks:
-                r = c.max() - c.min()
-                s = np.std(c, ddof=1)
-                if s > 0: rs_chunk.append(r / s)
-            if rs_chunk: rs_vals.append((lag, np.mean(rs_chunk)))
-        if len(rs_vals) < 2: return 0.5
-        H = np.polyfit(np.log([v[0] for v in rs_vals]), np.log([v[1] for v in rs_vals]), 1)[0]
+                mean_c  = np.mean(c)
+                deviate = np.cumsum(c - mean_c)
+                r       = deviate.max() - deviate.min()
+                s       = np.std(c, ddof=1)
+                if s > 0:
+                    rs_chunk.append(r / s)
+            if rs_chunk:
+                rs_vals.append((lag, np.mean(rs_chunk)))
+        if len(rs_vals) < 2:
+            return 0.5
+        lags_arr  = np.log([v[0] for v in rs_vals])
+        rs_arr    = np.log([v[1] for v in rs_vals])
+        H         = np.polyfit(lags_arr, rs_arr, 1)[0]
         return float(np.clip(H, 0.1, 0.9))
-    except Exception: return 0.5
+    except Exception:
+        return 0.5
 
 def _compute_regime(history_series: pd.Series) -> dict:
     prices = history_series.dropna().values[-252:]
-    if len(prices) < 30: return dict(hurst=0.5, trend_slope=0.0, mean_price=prices[-1], vol=0.02, ou_speed=0.05)
-    log_rets = np.diff(np.log(prices))
-    vol = float(np.std(log_rets)) if len(log_rets) > 1 else 0.02
-    H = _hurst_exponent(prices)
-    slope = float(np.polyfit(np.arange(len(prices)), np.log(prices), 1)[0]) * 252 
-    mean_price = float(prices[-20:].mean())
+    if len(prices) < 30:
+        return dict(hurst=0.5, trend_slope=0.0, mean_price=prices[-1], vol=0.02, ou_speed=0.05)
+
+    log_rets  = np.diff(np.log(prices))
+    vol       = float(np.std(log_rets)) if len(log_rets) > 1 else 0.02
+    H         = _hurst_exponent(prices)
+
+    x          = np.arange(len(prices))
+    log_prices = np.log(prices)
+    slope      = float(np.polyfit(x, log_prices, 1)[0]) * 252
+
+    ema_span   = min(200, len(prices))
+    weights    = np.exp(np.linspace(-1, 0, ema_span))
+    weights   /= weights.sum()
+    mean_price = float(np.convolve(prices, weights[::-1], mode='valid')[-1])
+
     try:
-        phi = np.clip(np.corrcoef(log_rets[:-1], log_rets[1:])[0, 1], -0.95, 0.95)
-        ou_speed = float(-np.log(abs(phi))) if abs(phi) > 0 else 0.05
-    except Exception: ou_speed = 0.05
+        if len(log_rets) > 10:
+            phi = np.corrcoef(log_rets[:-1], log_rets[1:])[0, 1]
+            phi = np.clip(phi, -0.99, 0.99)
+            ou_speed = float(-np.log(abs(phi))) if abs(phi) < 1.0 else 0.05
+        else:
+            ou_speed = 0.05
+    except Exception:
+        ou_speed = 0.05
+
     return dict(hurst=H, trend_slope=slope, mean_price=mean_price, vol=vol, ou_speed=ou_speed)
 
 def _single_step_forecast(model, scaler, lookback_context: list) -> float:
     x_sc = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
-    return float(scaler.inverse_transform([[float(model.predict(np.array(x_sc).reshape(1, LOOKBACK, 1), verbose=0)[0, 0])]])[0, 0])
+    x_in = np.array(x_sc, dtype=np.float32).reshape(1, LOOKBACK, 1)
+    raw = float(np.clip(model.predict(x_in, verbose=0)[0, 0], 0.0, 1.0))
+    return float(scaler.inverse_transform([[raw]])[0, 0])
 
-def _revise_prediction(raw_pred: float, prev_price: float, anchor_price: float, regime: dict, step: int) -> float:
+def _revise_prediction(
+    raw_pred: float, prev_price: float, anchor_price: float, regime: dict, step: int, total_steps: int
+) -> float:
     H = regime["hurst"]
     mean_price = regime["mean_price"]
     ou_speed = regime["ou_speed"]
     vol = regime["vol"]
-    raw_log_ret = np.log(max(raw_pred, 1e-3) / max(prev_price, 1e-3))
-    cumulative_log_ret = np.log(max(prev_price, 1e-3) / max(anchor_price, 1e-3))
-    
-    drift_correction = -np.sign(cumulative_log_ret) * max(abs(cumulative_log_ret) - (2.0 * vol * np.sqrt(step)), 0) * 0.12
-    ou_pull = -ou_speed * np.log(max(prev_price, 1e-3) / max(mean_price, 1e-3))
-    ou_scale = float(np.interp(H, [0.35, 0.50, 0.65], [0.30, 0.15, 0.05]))
-    
-    final_p = prev_price * np.exp(np.clip(raw_log_ret + drift_correction + (ou_scale * ou_pull), -3.5*vol, 3.5*vol))
-    return float(np.clip(final_p, mean_price * 0.3, mean_price * 3.0))
+
+    if prev_price <= 0 or anchor_price <= 0:
+        return raw_pred
+
+    raw_log_ret = np.log(max(raw_pred, 1e-6) / max(prev_price, 1e-6))
+    cumulative_log_ret = np.log(max(prev_price, 1e-6) / max(anchor_price, 1e-6))
+
+    drift_budget = 2.0 * vol * np.sqrt(step)
+    drift_excess = abs(cumulative_log_ret) - drift_budget
+
+    if drift_excess > 0:
+        correction_sign = -np.sign(cumulative_log_ret)
+        drift_correction = correction_sign * drift_excess * 0.15
+    else:
+        drift_correction = 0.0
+
+    price_gap_pct = abs(prev_price - mean_price) / mean_price
+    if price_gap_pct > 0.05:
+        ou_pull = -ou_speed * np.log(max(prev_price, 1e-6) / max(mean_price, 1e-6))
+        ou_scale = float(np.interp(H, [0.35, 0.50, 0.65], [0.35, 0.20, 0.08]))
+    else:
+        ou_pull = 0.0
+        ou_scale = 0.0
+
+    final_log_ret = raw_log_ret + drift_correction + (ou_scale * ou_pull)
+    final_log_ret = float(np.clip(final_log_ret, -4.0 * vol, 4.0 * vol))
+
+    revised_price = prev_price * np.exp(final_log_ret)
+    revised_price = float(np.clip(revised_price, mean_price * 0.20, mean_price * 3.50))
+    return revised_price
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
     biz_dates = pd.bdate_range(start=target_start, periods=n_days)
-    daily_vol = (df["DailyReturn"].std() / 100) if len(df) > 5 else 0.02
+
+    recent_ret = df["DailyReturn"].replace([np.inf, -np.inf], np.nan).dropna().tail(60)
+    daily_vol = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
+
     preds_prices = []
     bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
 
     if target_start <= db_max_date:
-        anchor_price = safe_float(df["Adj Close"].iloc[-1])
+        anchor_price_a = safe_float(df["Adj Close"].iloc[-1])
         future_step = 0
         for curr_date in biz_dates:
             if curr_date <= db_max_date:
-                preds_prices.append(safe_float(df["Adj Close"].reindex([curr_date], method='nearest').iloc[0]))
+                pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
+                pos_idx = max(pos_idx, 0)
+                preds_prices.append(float(df.iloc[pos_idx]["Adj Close"]))
             else:
                 future_step += 1
-                if not bridge_dates:
-                    curr_context = df["Adj Close"].loc[:df.index[df.index <= db_max_date][-1]].tail(LOOKBACK).tolist()
-                    regime = _compute_regime(df["Adj Close"].loc[:df.index[df.index <= db_max_date][-1]])
-                    curr_prev = safe_float(curr_context[-1])
-                rev_p = _revise_prediction(_single_step_forecast(model, scaler, curr_context), curr_prev, anchor_price, regime, future_step)
-                preds_prices.append(rev_p)
-                curr_context.append(rev_p)
-                curr_prev = rev_p
+                pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
+                if pos_idx != -1 and pos_idx >= LOOKBACK:
+                    history_slice = df.iloc[:pos_idx]
+                else:
+                    history_slice = df.head(LOOKBACK) if len(df) >= LOOKBACK else df
+
+                regime = _compute_regime(history_slice["Adj Close"])
+                lookback_context = list(df.iloc[:pos_idx]["Adj Close"].tail(LOOKBACK).values)
+                
+                while len(lookback_context) < LOOKBACK:
+                    lookback_context.insert(0, lookback_context[0] if lookback_context else anchor_price_a)
+
+                raw_f = _single_step_forecast(model, scaler, lookback_context)
+                prev_p = preds_prices[-1] if preds_prices else anchor_price_a
+                revised_f = _revise_prediction(raw_f, prev_p, anchor_price_a, regime, future_step, n_days)
+                preds_prices.append(revised_f)
+
                 bridge_dates.append(curr_date)
-                bridge_prices.append(rev_p)
-                w = daily_vol * np.sqrt(future_step)
-                bridge_lo.append(rev_p * np.exp(-1.96 * w))
-                bridge_hi.append(rev_p * np.exp(1.96 * w))
+                bridge_prices.append(revised_f)
+                spread = revised_f * (daily_vol * np.sqrt(future_step))
+                bridge_lo.append(revised_f - spread)
+                bridge_hi.append(revised_f + spread)
+
+        return biz_dates, np.array(preds_prices), bridge_dates, bridge_prices, bridge_lo, bridge_hi
+
     else:
+        anchor_price_b = safe_float(df["Adj Close"].iloc[-1])
         regime = _compute_regime(df["Adj Close"])
-        anchor_price = safe_float(df["Adj Close"].iloc[-1])
+        lookback_context = list(df["Adj Close"].tail(LOOKBACK).values)
+        
         gap_dates = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
-        virtual_context = df["Adj Close"].tail(LOOKBACK).tolist()
-        virtual_prev = anchor_price
-        v_step = 0
+        sim_step = 0
+
         for _ in gap_dates:
-            v_step += 1
-            virtual_prev = _revise_prediction(_single_step_forecast(model, scaler, virtual_context), virtual_prev, anchor_price, regime, v_step)
-            virtual_context.append(virtual_prev)
-        curr_context = list(virtual_context[-LOOKBACK:])
-        curr_prev = virtual_prev
-        future_step = v_step
+            sim_step += 1
+            raw_f = _single_step_forecast(model, scaler, lookback_context)
+            prev_p = lookback_context[-1] if lookback_context else anchor_price_b
+            revised_f = _revise_prediction(raw_f, prev_p, anchor_price_b, regime, sim_step, len(gap_dates) + n_days)
+            lookback_context.append(revised_f)
+            lookback_context.pop(0)
+
+        future_step = sim_step
         for curr_date in biz_dates:
             future_step += 1
-            rev_p = _revise_prediction(_single_step_forecast(model, scaler, curr_context), curr_prev, anchor_price, regime, future_step)
-            preds_prices.append(rev_p)
-            curr_context.append(rev_p)
-            curr_prev = rev_p
-            bridge_dates.append(curr_date)
-            bridge_prices.append(rev_p)
-            w = daily_vol * np.sqrt(future_step)
-            bridge_lo.append(rev_p * np.exp(-1.96 * w))
-            bridge_hi.append(rev_p * np.exp(1.96 * w))
+            raw_f = _single_step_forecast(model, scaler, lookback_context)
+            prev_p = lookback_context[-1] if lookback_context else anchor_price_b
+            revised_f = _revise_prediction(raw_f, prev_p, anchor_price_b, regime, future_step, len(gap_dates) + n_days)
+            
+            preds_prices.append(revised_f)
+            lookback_context.append(revised_f)
+            lookback_context.pop(0)
 
-    return biz_dates, preds_prices, bridge_dates, bridge_prices, bridge_lo, bridge_hi
+            bridge_dates.append(curr_date)
+            bridge_prices.append(revised_f)
+            spread = revised_f * (daily_vol * np.sqrt(future_step))
+            bridge_lo.append(revised_f - spread)
+            bridge_hi.append(revised_f + spread)
+
+        return biz_dates, np.array(preds_prices), bridge_dates, bridge_prices, bridge_lo, bridge_hi
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                  DATA WORKLOAD PIPELINE                  ║
+# ║                    APPLICATION ENTRY                     ║
 # ╚══════════════════════════════════════════════════════════╝
-dv, run_warnings = load_data()
 
-# SIDEBAR CONTROLLER RE-LAYOUT
+dv, flags = load_data()
+
+st.markdown(
+    f'<div class="app-header-banner">'
+    f'<div class="app-title"><span class="shiny-text">⚡ TSLA Deep-Quant Hybrid Pipeline</span></div>'
+    f'<div class="app-subtitle">Recurrent Convolutional Network + Fractal Hurst Regimes + OU Damping</div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
+
+for msg in flags:
+    st.sidebar.warning(msg)
+
+if dv.empty:
+    empty_state("🚨", "System Data Layer Malfunction. Check formatting constraints.")
+    st.stop()
+
+# ── Sidebar Input Configuration Controls ──────────────────────────────
 with st.sidebar:
-    st.markdown('<div class="shiny-text" style="font-size:1.10rem; font-family:\'Space Grotesk\'; letter-spacing:0.05em; margin-bottom:12px;">⚡ PARAMETER OPERATIONAL CONTROLS</div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-header">Pipeline Status</p>', unsafe_allow_html=True)
-    st.markdown(f'<div class="indicator-row"><span class="ind-icon">📈</span><span class="ind-name">TSLA Matrix</span><span class="ind-badge badge-bull">{len(dv)} Rows</span></div>', unsafe_allow_html=True)
-
-    st.markdown('<p class="section-header">Neural Engine Node</p>', unsafe_allow_html=True)
-    user_link = st.text_input("Model Link Config Entry:", value=get_secret_model_link(), placeholder="Google Drive Share link...")
+    st.markdown('<p class="section-header">Account Exposure Parameters</p>', unsafe_allow_html=True)
     
-    # Simple architecture simulation model assignment fallback
-    class FallbackNeuralArchitecture:
-        def predict(self, x, verbose=0): return np.array([[0.518]])
-    loaded_model = FallbackNeuralArchitecture()
+    default_entry = float(dv["Close"].iloc[-1]) if not dv.empty else 220.0
+    
+    entry_price = st.number_input(
+        "Position Entry Price ($)", 
+        min_value=1.0, 
+        max_value=10000.0, 
+        value=round(default_entry, 2), 
+        step=0.5,
+        help="Specify the asset baseline cost basis value."
+    )
+    
+    share_quantity = st.number_input(
+        "Position Share Quantity", 
+        min_value=1, 
+        max_value=1000000, 
+        value=10, 
+        step=5,
+        help="Specify total held units exposed within the pipeline horizon."
+    )
+    
+    total_exposure = entry_price * share_quantity
+    st.markdown(
+        f'<div style="font-size:0.75rem; color:#64748b; margin-top:-10px; padding-left:2px;">'
+        f'Active Notional Value: <span style="color:#ffcc00; font-family:\'JetBrains Mono\'">${total_exposure:,.2f}</span></div>', 
+        unsafe_allow_html=True
+    )
+    st.markdown("---")
 
-    st.markdown('<div class="indicator-row"><span class="ind-icon">⚙️</span><span class="ind-name">CNN-GRU Module</span><span class="ind-badge badge-bull">Engine Live</span></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-header">Time Horizon Optimization</p>', unsafe_allow_html=True)
-    pick_start = st.date_input("Anchor Execution Frame Target:", value=(dv.index.max() - pd.Timedelta(days=30)).to_pydatetime())
-    pick_days  = st.slider("Forecast Forward Window Matrix Length:", min_value=5, max_value=120, value=30, step=5)
-    st.button("SYNCHRONIZE QUANT LAYERS")
+    st.markdown('<p class="section-header">Execution Target Vector</p>', unsafe_allow_html=True)
+    gdrive_link = st.text_input("Google Drive Model Path", value=get_secret_model_link())
+    
+    anchor_dt = st.date_input("Projection Mapping Node Anchor", value=dv.index.max())
+    projection_horizon = st.slider("Projection Days Window", min_value=5, max_value=90, value=30, step=5)
 
-# MODULE 12: HERO BANNER STRIP STRUCTURE
-st.markdown(f"""
-<div style="position:relative; background:rgba(8,11,22,0.85); border:1px solid rgba(59,130,246,0.26); border-radius:16px; padding:22px 28px; margin-bottom:20px; backdrop-filter:blur(24px); overflow:hidden;">
-    <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, transparent, #ffcc00, transparent); background-size:200% auto;"></div>
-    <div style="font-family:'Space Grotesk'; font-weight:700; font-size:1.55rem; color:#ffffff;"><span class="shiny-text">TSLA HYBRID PREDICTIVE FORECAST MATRIX ENVIRONMENT</span></div>
-    <div style="font-family:'JetBrains Mono'; font-size:0.72rem; color:#64748b; letter-spacing:0.08em; margin-top:4px;">HYBRID DEEP RECURSION PIPELINE SYSTEM NODE LAYER V2.5</div>
-</div>
-""", unsafe_allow_html=True)
+model_id = extract_gdrive_id(gdrive_link) if gdrive_link else None
 
-# 5 INTERACTIVE METRICS CARD ROW
-t_close, t_open, t_high, t_low, t_vol = dv["Close"].iloc[-1], dv["Open"].iloc[-1], dv["High"].iloc[-1], dv["Low"].iloc[-1], dv["Volume"].iloc[-1]
-t_return = dv["DailyReturn"].fillna(0.0).iloc[-1]
+if not model_id:
+    st.sidebar.info("Awaiting structural neural signature. Provide link node validation key.")
+    empty_state("🧠", "Awaiting quantitative deep-learning deployment signature key within the control center.")
+    st.stop()
 
-c1, c2, c3, c4, c5 = st.columns(5)
-with c1: st.markdown(metric_card("Telemetry Tracker Close", f"${t_close:.2f}", f"{'+' if t_return>=0 else ''}{t_return:.2f}%", "metric-delta-up" if t_return>=0 else "metric-delta-down"), unsafe_allow_html=True)
-with c2: st.markdown(metric_card("Opening Pulse Vector", f"${t_open:.2f}", "Exchange Grid", "metric-muted"), unsafe_allow_html=True)
-with c3: st.markdown(metric_card("Apex Session High", f"${t_high:.2f}", "Peak Frontier Limit", "metric-muted"), unsafe_allow_html=True)
-with c4: st.markdown(metric_card("Base Support Low", f"${t_low:.2f}", "Floor Support Matrix", "metric-muted"), unsafe_allow_html=True)
-with c5: st.markdown(metric_card("Aggregated Volume Node", f"{t_vol/1e6:.2f}M", "Liquidity Density", "metric-muted"), unsafe_allow_html=True)
+try:
+    nn_engine = load_model_cached(model_id)
+    data_scaler = build_scaler(dv)
+except Exception as ex:
+    empty_state("❌", f"Structural core failure executing initialization vector: {ex}")
+    st.stop()
 
-# THE 3 STRATEGIC INTERFACE TABS
-t1, t2, t3 = st.tabs(["📊 METRIC STREAM INTERFACE", "⚡ EXTENDED HORIZON ENGINE", "🔬 ADVANCED ANALYTICS TAB"])
+# Compute active simulation data parameters
+t_anchor = pd.Timestamp(anchor_dt)
+f_dates, f_prices, b_dates, b_prices, b_lo, b_hi = dynamic_timeline_forecasting(
+    nn_engine, data_scaler, dv, t_anchor, projection_horizon
+)
+regime_metrics = _compute_regime(dv["Adj Close"])
 
-# ────────────────────────────────────────────────────────────
-# TAB 1: METRIC STREAM INTERFACE
-# ────────────────────────────────────────────────────────────
-with t1:
-    st.markdown('<p class="section-header">Realtime Telemetry Stream Node Matrix</p>', unsafe_allow_html=True)
-    r1a, r1b = st.columns([3, 1])
-    with r1a:
-        fig1 = go.Figure()
-        fig1.add_trace(go.Candlestick(x=dv.index, open=dv['Open'], high=dv['High'], low=dv['Low'], close=dv['Close'], name='Candlestick', increasing_line_color=GREEN, decreasing_line_color=RED))
-        fig1.add_trace(go.Scatter(x=dv.index, y=dv['MA30'], line=dict(color=BLUE, width=1.2), name='MA30 Matrix'))
-        fig1.add_trace(go.Scatter(x=dv.index, y=dv['MA200'], line=dict(color=PURPLE, width=1.5), name='MA200 Blueprint'))
-        fig1.update_layout(**base_layout(400, "Historical Node Candle Streams Feeds"), xaxis_rangeslider_visible=False)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig1, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with r1b:
-        st.markdown('<p class="section-header" style="margin-top:0;">System Signal Nodes</p>', unsafe_allow_html=True)
-        lrsi = safe_float(dv["RSI"].iloc[-1], 50.0)
-        st.markdown(f'<div class="indicator-row"><span class="ind-icon">📊</span><span class="ind-name">Relative Strength Vector (RSI)</span><span class="ind-badge badge-neut">{lrsi:.1f}</span></div>', unsafe_allow_html=True)
-        
-        # MODULE 21: ADVANCED GRAPH: DYNAMIC BOUNDARY DISPERSION (BOLLINGER)
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=dv.index[-60:], y=dv['BB_Upper'].tail(60), line=dict(color=MUTED, width=1, dash='dash'), name='Upper Band'))
-        fig2.add_trace(go.Scatter(x=dv.index[-60:], y=dv['Close'].tail(60), line=dict(color=ACCENT, width=1.6), fill='tonexty', fillcolor='rgba(255,204,0,0.01)', name='Close Line'))
-        fig2.add_trace(go.Scatter(x=dv.index[-60:], y=dv['BB_Lower'].tail(60), line=dict(color=MUTED, width=1, dash='dash'), name='Lower Band'))
-        fig2.update_layout(**base_layout(230, "Dynamic Bollinger Band Edge Trajectories"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig2, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+# Establish Tab Components
+tab1, tab2, tab3 = st.tabs(["System Signals Matrix", "Predictive Projection Flight", "Advanced Analytic Center"])
 
-    st.markdown('<p class="section-header">Liquidity Volume Trackers & Convergence Momentum</p>', unsafe_allow_html=True)
-    r2a, r2b = st.columns(2)
-    with r2a:
-        # MODULE 22: ADVANCED GRAPH: LIQUIDITY DISTRIBUTION MATRIX (VOLUME PLOT)
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(x=dv.index[-90:], y=dv["Volume"].tail(90), marker_color=[GREEN if r >= 0 else RED for r in dv["DailyReturn"].tail(90)], name="Volume"))
-        fig3.update_layout(**base_layout(240, "Liquidity Distribution Quantization Matrix"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig3, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with r2b:
-        # MODULE 23: ADVANCED GRAPH: CONVERGENCE/DIVERGENCE MOMENTUM MATRIX (MACD PLOT)
-        fig4 = go.Figure()
-        fig4.add_trace(go.Bar(x=dv.index[-90:], y=dv["MACDHist"].tail(90), marker_color=BLUE, name="MACD Spectrum"))
-        fig4.add_trace(go.Scatter(x=dv.index[-90:], y=dv["MACD"].tail(90), line=dict(color=ACCENT, width=1.2), name="MACD Core"))
-        fig4.update_layout(**base_layout(240, "Convergence/Divergence Macro Differential Spectrum"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig4, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+# ╔══════════════════════════════════════════════════════════╗
+# ║                    TAB 1: Core System Matrix             ║
+# ╚══════════════════════════════════════════════════════════╝
+with tab1:
+    st.markdown('<p class="section-header">Execution Layer Metric Anchors</p>', unsafe_allow_html=True)
+    
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(metric_card("Current Close", f"${dv['Close'].iloc[-1]:,.2f}", "Live Database Value", "metric-muted"), unsafe_allow_html=True)
+    with m2:
+        st.markdown(metric_card("Position Size", f"{share_quantity:,} Units", f"Basis: ${entry_price:,.2f}", "metric-muted"), unsafe_allow_html=True)
+    with m3:
+        pnl = (dv['Close'].iloc[-1] - entry_price) * share_quantity
+        pnl_pct = ((dv['Close'].iloc[-1] - entry_price) / entry_price) * 100
+        cls, sign = ("metric-delta-up", "+") if pnl >= 0 else ("metric-delta-down", "")
+        st.markdown(metric_card("Unrealized P&L", f"{sign}${pnl:,.2f}", f"{sign}{pnl_pct:.2f}% Basis Delta", cls), unsafe_allow_html=True)
+    with m4:
+        signal_text = "BUY" if dv["RSI"].iloc[-1] < 45 else ("SELL" if dv["RSI"].iloc[-1] > 65 else "HOLD")
+        sig_badge = f"signal-{signal_text.lower()}"
+        st.markdown(
+            f'<div class="metric-card"><div class="metric-label">Pipeline Consensus Node</div>'
+            f'<div class="{sig_badge}" style="font-size:1.1rem !important; padding:4px 12px !important; margin-top:4px;">{signal_text}</div></div>',
+            unsafe_allow_html=True
+        )
 
-# ────────────────────────────────────────────────────────────
-# TAB 2: EXTENDED HORIZON ENGINE
-# ────────────────────────────────────────────────────────────
-with t2:
-    st.markdown('<p class="section-header">Machine Learning Structural Projections Pipeline</p>', unsafe_allow_html=True)
-    f_dates, f_prices, b_dates, b_prices, b_lo, b_hi = dynamic_timeline_forecasting(loaded_model, build_scaler(dv), dv, pd.Timestamp(pick_start), pick_days)
+    st.markdown('<p class="section-header">System Signal Nodes Matrix</p>', unsafe_allow_html=True)
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.markdown(
+            f'<div class="indicator-row"><span class="ind-icon">📈</span><span class="ind-name">Hurst Regime Structural Exponent</span>'
+            f'<span class="ind-badge badge-bull">{regime_metrics["hurst"]:.2f} Alpha</span></div>', unsafe_allow_html=True
+        )
+        st.markdown(
+            f'<div class="indicator-row"><span class="ind-icon">📊</span><span class="ind-name">Relative Strength Index (RSI-14)</span>'
+            f'<span class="ind-badge {"badge-bear" if dv["RSI"].iloc[-1] > 70 else "badge-bull" if dv["RSI"].iloc[-1] < 30 else "badge-neut"}">{dv["RSI"].iloc[-1]:.1f}</span></div>', unsafe_allow_html=True
+        )
+    with col_r:
+        st.markdown(
+            f'<div class="indicator-row"><span class="ind-icon">🔄</span><span class="ind-name">Ornstein-Uhlenbeck Mean-Reversion Damping Speed</span>'
+            f'<span class="ind-badge badge-neut">{regime_metrics["ou_speed"]:.3f} λ</span></div>', unsafe_allow_html=True
+        )
+        st.markdown(
+            f'<div class="indicator-row"><span class="ind-icon">📉</span><span class="ind-name">Moving Average Convergence Divergence (MACD)</span>'
+            f'<span class="ind-badge {"badge-bull" if dv["MACDHist"].iloc[-1] > 0 else "badge-bear"}">Hist Delta: {dv["MACDHist"].iloc[-1]:.3f}</span></div>', unsafe_allow_html=True
+        )
 
-    r3a, r3b = st.columns([3, 1])
-    with r3a:
-        fig5 = go.Figure()
-        h_slice = dv[dv.index >= pd.Timestamp(pick_start) - pd.Timedelta(days=90)]["Adj Close"]
-        fig5.add_trace(go.Scatter(x=h_slice.index, y=h_slice.values, line=dict(color=MUTED, width=1.5), name="Historical Feed Context"))
-        fig5.add_trace(go.Scatter(x=f_dates, y=f_prices, line=dict(color=ACCENT, width=2.5), name="Hybrid Forecast Core"))
-        if b_dates:
-            fig5.add_trace(go.Scatter(x=b_dates, y=b_hi, line=dict(width=0), showlegend=False))
-            fig5.add_trace(go.Scatter(x=b_dates, y=b_lo, line=dict(width=0), fill='tonexty', fillcolor='rgba(255,204,0,0.04)', name='Confidence Band (95%)'))
-        fig5.update_layout(**base_layout(400, "Hybrid Predictor Pipeline Forward Projection Mapping Node", override_yaxis=dict(tickprefix="$")))
+# ╔══════════════════════════════════════════════════════════╗
+# ║                    TAB 2: Simplified Projections         ║
+# ╚══════════════════════════════════════════════════════════╝
+with tab2:
+    st.markdown('<p class="section-header">Predictive Model Structural Projections Flight Path</p>', unsafe_allow_html=True)
+    
+    # Trace logic corrected here to capture the last point of history to close the gap
+    hist_tail = dv.tail(LOOKBACK)
+    last_known_date = hist_tail.index[-1]
+    last_known_val = float(hist_tail["Adj Close"].iloc[-1])
+
+    # Prepend history edge to prediction arrays to ensure perfect mathematical convergence
+    gapless_dates = [last_known_date] + list(f_dates)
+    gapless_prices = [last_known_val] + list(f_prices)
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(
+        x=hist_tail.index, y=hist_tail["Adj Close"],
+        name="Historical Baseline actuals", line=dict(color=BLUE, width=2)
+    ))
+    fig2.add_trace(go.Scatter(
+        x=gapless_dates, y=gapless_prices,
+        name="Network Dynamic Projections Outflow", line=dict(color=ACCENT, width=2.5, dash="dash")
+    ))
+    fig2.update_layout(**base_layout(420, "Continuous Forecast Runway Node Integration Framework"))
+    
+    st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
+    st.plotly_chart(fig2, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ╔══════════════════════════════════════════════════════════╗
+# ║                    TAB 3: Advanced Analytic Center       ║
+# ╚══════════════════════════════════════════════════════════╝
+with tab3:
+    st.markdown('<p class="section-header">Unified Quant Analytics Hub & Subtrace Clusters</p>', unsafe_allow_html=True)
+    
+    # ── GRAPH 5 AND GRAPH REGIME SETUP ─────────────────────────────────────────
+    fig5 = go.Figure()
+    fig5.add_trace(go.Scatter(x=dv.index[-LOOKBACK:], y=dv["Adj Close"].tail(LOOKBACK), name="Context Historical Actuals", line=dict(color=BLUE, width=2)))
+    if b_dates:
+        fig5.add_trace(go.Scatter(x=[last_known_date] + list(b_dates), y=[last_known_val] + list(b_prices), name="Hybrid Recursive Mean", line=dict(color=ACCENT, width=2.5)))
+        fig5.add_trace(go.Scatter(x=b_dates, y=b_hi, name="Upper Sigma Boundary Bound", line=dict(width=0), showlegend=False))
+        fig5.add_trace(go.Scatter(x=b_dates, y=b_lo, name="Lower Sigma Boundary Bound", fill='tonexty', fillcolor="rgba(255,204,0,0.06)", line=dict(width=0), showlegend=False))
+    # Corrected internal parameter layout assignment format!
+    fig5.update_layout(**base_layout(400, "Hybrid Predictor Pipeline Forward Projection Mapping Node", override_yaxis=dict(tickprefix="$")))
+
+    fig_adv_reg = go.Figure()
+    fig_adv_reg.add_trace(go.Scatter(x=dv.index[-120:], y=dv["Adj Close"].tail(120), name="Asset Underlying Actuals Path", line=dict(color="rgba(255,255,255,0.4)", width=1.5)))
+    fig_adv_reg.add_trace(go.Scatter(x=dv.index[-120:], y=dv["MA30"].tail(120), name="Micro-Trend Node (MA30)", line=dict(color=BLUE, width=1.2, dash="dot")))
+    fig_adv_reg.add_trace(go.Scatter(x=dv.index[-120:], y=dv["BB_Upper"].tail(120), name="Bollinger Top Alpha Boundary", line=dict(color="rgba(16,185,129,0.25)", width=1)))
+    fig_adv_reg.add_trace(go.Scatter(x=dv.index[-120:], y=dv["BB_Lower"].tail(120), name="Bollinger Bottom Alpha Boundary", line=dict(color="rgba(244,63,94,0.25)", width=1)))
+    # Corrected internal parameter layout assignment format!
+    fig_adv_reg.update_layout(**base_layout(400, "Advanced Analytic 2: Long-Term Horizon Regime Projections Grid", override_yaxis=dict(tickprefix="$")))
+
+    # Display row 1
+    r1, r2 = st.columns(2)
+    with r1:
         st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
         st.plotly_chart(fig5, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-    with r3b:
-        # MODULE 24: INTERACTIVE SIGNAL TELEMETRY STATUS CONTROLLERS
-        st.markdown('<p class="section-header" style="margin-top:0;">Telemetry Signal Status</p>', unsafe_allow_html=True)
-        rmeta = _compute_regime(dv["Adj Close"])
-        st.markdown(f'<div class="indicator-row"><span class="ind-icon">📊</span><span class="ind-name">Hurst Coefficient</span><span class="ind-badge badge-bull">{rmeta["hurst"]:.3f}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="indicator-row"><span class="ind-icon">⚙️</span><span class="ind-name">OU Speed Speed Parameter</span><span class="ind-badge badge-neut">{rmeta["ou_speed"]:.4f}</span></div>', unsafe_allow_html=True)
-        
-        st.markdown('<p class="section-header">Operational Trigger Signal</p>', unsafe_allow_html=True)
-        fdelt = ((f_prices[-1] - f_prices[0]) / f_prices[0]) * 100
-        st.markdown('<div style="text-align:center; padding:12px 0;">', unsafe_allow_html=True)
-        if fdelt > 3.0: st.markdown('<span class="signal-buy">BUY SIGNUM</span>', unsafe_allow_html=True)
-        elif fdelt < -3.0: st.markdown('<span class="signal-sell">SELL SIGNUM</span>', unsafe_allow_html=True)
-        else: st.markdown('<span class="signal-hold">HOLD SIGNUM</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ────────────────────────────────────────────────────────────
-# TAB 3: ADVANCED ANALYTICS TAB (All Missing Analytics Re-injected & Expanded)
-# ────────────────────────────────────────────────────────────
-with t3:
-    st.markdown('<p class="section-header">Deep Quant Vector Fields & Mathematical Structural Matrices</p>', unsafe_allow_html=True)
-    
-    # ── ADVANCED MODULE 25: VOLATILITY WAVEFORM & RESIDUAL RETURNS DEVIATION FIELD ──
-    st.markdown('<p class="section-header">Advanced Analytic 1: Residual Volatility Waveform Vector Fields</p>', unsafe_allow_html=True)
-    fig_adv_wave = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, subplot_titles=("Daily Returns Vector Spectrum", "Rolling Volatility Waveform Transformation Node Space"))
-    fig_adv_wave.add_trace(go.Scatter(x=dv.index, y=dv["DailyReturn"], line=dict(color=BLUE, width=1), name="Daily Matrix Returns (%)"), row=1, col=1)
-    fig_adv_wave.add_trace(go.Scatter(x=dv.index, y=dv["DailyReturn"].rolling(20).std(), line=dict(color=PURPLE, width=1.2), fill='tozeroy', fillcolor='rgba(168,85,247,0.06)', name="Rolling Volatility Spectrum"), row=2, col=1)
-    fig_adv_wave.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(10,14,24,0.45)", font_color=FONT_COL, height=350, margin=dict(l=45, r=20, t=35, b=25), showlegend=False)
-    fig_adv_wave.update_xaxes(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL)
-    fig_adv_wave.update_yaxes(gridcolor=GRID_COL, showgrid=True, linecolor=GRID_COL)
-    st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-    st.plotly_chart(fig_adv_wave, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    ra, rb = st.columns(2)
-    with ra:
-        # ── ADVANCED MODULE 26: HORIZON REGIME DEVIATION OVERLAY GRAPH ──
-        fig_adv_reg = go.Figure()
-        fig_adv_reg.add_trace(go.Scatter(x=dv.index, y=dv["Close"], line=dict(color=MUTED, width=1), name="History"))
-        fig_adv_reg.add_trace(go.Scatter(x=f_dates, y=f_prices, line=dict(color=GREEN, width=2), name="Horizon Core Node Matrix"))
-        fig_adv_reg.update_layout(**base_layout(320, "Advanced Analytic 2: Long-Term Horizon Regime Projections Grid", override_yaxis=dict(tickprefix="$")))
+    with r2:
         st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
         st.plotly_chart(fig_adv_reg, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
-        
-    with rb:
-        # ── ADVANCED MODULE 27: SEASONALITY STRUCTURAL METRIC SPACE ──
-        fig_adv_seas = go.Figure()
-        for idx, m_name in enumerate(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], 1):
-            sub_m = dv[dv.index.month == idx]["Close"].dropna()
-            if not sub_m.empty: 
-                fig_adv_seas.add_trace(go.Box(y=sub_m, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.1)"))
-        fig_adv_seas.update_layout(**base_layout(320, "Advanced Analytic 3: Seasonality Structural Distributions Matrix"), showlegend=False)
+
+    # ── BOX PLOTS AND HEATMAP SUBSURFACE PLOTS ─────────────────────────────────
+    st.markdown('<p class="section-header">Cross-Sectional Factor Correlations & Seasonal Distribution Matrices</p>', unsafe_allow_html=True)
+    
+    r3, r4 = st.columns(2)
+    with r3:
+        months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        fig8 = go.Figure()
+        for m_idx, m_name in enumerate(months, 1):
+            sub = dv[dv.index.month == m_idx]["Close"].dropna()
+            if not sub.empty: 
+                fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.12)"))
+        fig8.update_layout(**base_layout(400, "Seasonality Structural Distribution Matrices"), showlegend=False)
         st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig_adv_seas, use_container_width=True)
+        st.plotly_chart(fig8, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── ADVANCED MODULE 28: FEATURE INTERDEPENDENCY HEATMAP MATRIX ──
-    st.markdown('<p class="section-header">Advanced Analytic 4: Cross-Sectional Attribute Dependency Matrix Heatmap</p>', unsafe_allow_html=True)
-    hc_cols = [col for col in ["Open", "High", "Low", "Close", "Volume", "Spread"] if col in dv.columns]
-    if len(hc_cols) >= 2:
-        c_matrix = dv[hc_cols].dropna().corr().round(3)
-        fig_adv_heat = go.Figure(go.Heatmap(z=c_matrix.values, x=hc_cols, y=hc_cols, colorscale="RdBu", zmid=0, text=c_matrix.values, texttemplate="%{text:.2f}"))
-        fig_adv_heat.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=FONT_COL, height=340, margin=dict(l=45, r=20, t=15, b=30))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig_adv_heat, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    with r4:
+        corr_cols = [c for c in ["Open", "High", "Low", "Close", "Volume", "Spread"] if c in dv.columns]
+        corr_data = dv[corr_cols].dropna()
+        if len(corr_data) >= 5 and len(corr_cols) >= 2:
+            c_mat = corr_data.corr().round(3)
+            fig11 = go.Figure(go.Heatmap(
+                z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                text=c_mat.values, texttemplate="%{text:.2f}", showscale=True
+            ))
+            fig11.update_layout(**base_layout(400, "Cross-Sectional Attribute Correlation Matrix Heatmap"))
+            st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
+            st.plotly_chart(fig11, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            empty_state("📊", "Insufficient data vector dimensions to isolate core cross-sectional attributes mapping.")

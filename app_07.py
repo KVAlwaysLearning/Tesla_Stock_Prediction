@@ -15,17 +15,25 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 def clean_html(html_code: str) -> str:
-    """Strips leading whitespace from each line to prevent Streamlit's markdown parser
-    from treating indented HTML block lines (>= 4 spaces) as markdown code blocks."""
+    """Compacts HTML code into a single-line string with comments removed, 
+    completely preventing Streamlit's markdown parser from falsely wrapping 
+    multiline indented HTML segments as markdown blocks."""
     if not html_code:
         return ""
-    return "\n".join(line.strip() for line in html_code.splitlines())
+    # Strip HTML comments to avoid parser confusion
+    html_code = re.sub(r'<!--.*?-->', '', html_code, flags=re.DOTALL)
+    # Replace all kinds of newlines with spaces
+    html_code = html_code.replace("\n", " ").replace("\r", " ")
+    # Compact any multiple consecutive whitespace characters into a single space
+    html_code = re.sub(r'\s+', ' ', html_code)
+    return html_code.strip()
 
 import streamlit.delta_generator
 _original_dg_markdown = streamlit.delta_generator.DeltaGenerator.markdown
 def safe_dg_markdown(self, body, *args, **kwargs):
     if isinstance(body, str) and body.strip().startswith("<"):
         body = clean_html(body)
+        kwargs["unsafe_allow_html"] = True
     return _original_dg_markdown(self, body, *args, **kwargs)
 streamlit.delta_generator.DeltaGenerator.markdown = safe_dg_markdown
 
@@ -63,46 +71,110 @@ st.markdown("""
    LIQUID ETHER BACKGROUND (reactbits: LiquidEther)
    Dynamic swirling, morphing fluid mesh of ether gradients
 ═══════════════════════════════════════════════ */
-@keyframes rb-liquid-ether-a {
-  0%   { background-position: 0% 0%; transform: scale(1) rotate(0deg); }
-  50%  { background-position: 50% 100%; transform: scale(1.15) rotate(180deg); }
-  100% { background-position: 100% 0%; transform: scale(1) rotate(360deg); }
+@keyframes rb-orb-float-center {
+  0% { transform: translate(-50%, -50%) translate(0, 0) scale(1.0); filter: blur(60px) hue-rotate(0deg); }
+  50% { transform: translate(-50%, -50%) translate(40px, -60px) scale(1.15); filter: blur(45px) hue-rotate(20deg); }
+  100% { transform: translate(-50%, -50%) translate(-30px, 40px) scale(0.92); filter: blur(75px) hue-rotate(-15deg); }
 }
-@keyframes rb-liquid-ether-b {
-  0%   { background-position: 100% 100%; transform: scale(1.2) rotate(360deg); }
-  50%  { background-position: 0% 50%; transform: scale(0.9) rotate(180deg); }
-  100% { background-position: 100% 100%; transform: scale(1.2) rotate(0deg); }
+
+@keyframes rb-orb-float-glow {
+  0% { opacity: 0.40; transform: translate(-50%, -50%) scale(1.0) rotate(0deg); }
+  50% { opacity: 0.60; transform: translate(-50%, -50%) scale(1.2) rotate(180deg); }
+  100% { opacity: 0.40; transform: translate(-50%, -50%) scale(1.0) rotate(360deg); }
+}
+
+@keyframes rb-suborb-orbit-1 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) translateX(300px) rotate(0deg) scale(0.8); }
+  50% { transform: translate(-50%, -50%) rotate(180deg) translateX(360px) rotate(-180deg) scale(1.1); }
+  100% { transform: translate(-50%, -50%) rotate(360deg) translateX(300px) rotate(-360deg) scale(0.8); }
+}
+
+@keyframes rb-suborb-orbit-2 {
+  0% { transform: translate(-50%, -50%) rotate(120deg) translateX(400px) rotate(-120deg) scale(1.1); }
+  50% { transform: translate(-50%, -50%) rotate(300deg) translateX(320px) rotate(-300deg) scale(0.9); }
+  100% { transform: translate(-50%, -50%) rotate(480deg) translateX(400px) rotate(-480deg) scale(1.1); }
 }
 
 .stApp {
-  background-color: #03050a !important;
+  background-color: #03050c !important;
   color: #e2e8f5 !important;
   font-family: 'Inter', sans-serif !important;
   overflow-x: hidden;
+  position: relative;
 }
 
+/* Background overlay of Orbs */
+.rb-background-orb-center {
+  position: fixed;
+  top: 55%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff007f 0%, #7c3aed 35%, #06b6d4 70%, transparent 100%);
+  mix-blend-mode: screen;
+  z-index: 0;
+  pointer-events: none;
+  animation: rb-orb-float-center 22s ease-in-out infinite alternate;
+  opacity: 0.35;
+}
+
+.rb-background-orb-glow {
+  position: fixed;
+  top: 55%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1000px;
+  height: 1000px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(99, 102, 241, 0.10) 45%, rgba(13, 148, 136, 0.05) 75%, transparent 100%);
+  mix-blend-mode: color-dodge;
+  z-index: 0;
+  pointer-events: none;
+  animation: rb-orb-float-glow 30s ease-in-out infinite alternate;
+  filter: blur(100px);
+}
+
+.rb-background-suborb-1 {
+  position: fixed;
+  top: 55%;
+  left: 50%;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(16, 185, 129, 0) 70%);
+  filter: blur(25px);
+  mix-blend-mode: screen;
+  z-index: 0;
+  pointer-events: none;
+  animation: rb-suborb-orbit-1 38s linear infinite;
+  opacity: 0.55;
+}
+
+.rb-background-suborb-2 {
+  position: fixed;
+  top: 55%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.30) 0%, rgba(239, 68, 68, 0) 70%);
+  filter: blur(35px);
+  mix-blend-mode: screen;
+  z-index: 0;
+  pointer-events: none;
+  animation: rb-suborb-orbit-2 48s linear infinite;
+  opacity: 0.45;
+}
+
+/* Background grid details */
 .stApp::before {
   content: "";
-  position: fixed; inset: -50%; z-index: 0; pointer-events: none;
-  background: 
-    radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 40%, rgba(168, 85, 247, 0.18) 0%, transparent 50%),
-    radial-gradient(ellipse at 40% 80%, rgba(244, 63, 94, 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse at 90% 10%, rgba(255, 204, 0, 0.08) 0%, transparent 40%);
-  filter: blur(80px) contrast(1.15);
-  animation: rb-liquid-ether-a 35s ease-in-out infinite alternate;
-}
-.stApp::after {
-  content: "";
-  position: fixed; inset: -50%; z-index: 0; pointer-events: none;
-  background: 
-    radial-gradient(ellipse at 70% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 10% 50%, rgba(16, 185, 129, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse at 50% 30%, rgba(236, 72, 153, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 90%, rgba(255, 204, 0, 0.06) 0%, transparent 40%);
-  filter: blur(100px) contrast(1.2);
-  animation: rb-liquid-ether-b 42s ease-in-out infinite alternate;
-  mix-blend-mode: color-dodge;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1.2px, transparent 1.2px);
+  background-size: 28px 28px;
+  opacity: 0.85;
 }
 
 /* Futuristic Fine Dots Pattern Overlay (reactbits: DotGrid) */
@@ -1109,6 +1181,14 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
   box-shadow: 0 8px 24px rgba(244,63,94,0.12) !important;
 }
 </style>
+""", unsafe_allow_html=True)
+
+# Render the backgrounds: Orb centerpiece background of reactbits (Orbiting sub-orbs and centerpieces)
+st.markdown("""
+<div class="rb-background-orb-glow"></div>
+<div class="rb-background-orb-center"></div>
+<div class="rb-background-suborb-1"></div>
+<div class="rb-background-suborb-2"></div>
 """, unsafe_allow_html=True)
 
 # ╔══════════════════════════════════════════════════════════╗

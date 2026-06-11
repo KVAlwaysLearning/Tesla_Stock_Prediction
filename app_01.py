@@ -826,9 +826,9 @@ with tab2:
                     )
 
 
-# ════════════════════════════════════════════════════════════
-#  TAB 3 — EXPLORATORY ENGINE
-# ════════════════════════════════════════════════════════════
+# ============================================================
+#  TAB 3 — EXPLORATORY ENGINE (FIXED LAYOUTS)
+# ============================================================
 with tab3:
     fa, fb = st.columns(2)
     with fa:
@@ -973,8 +973,8 @@ with tab3:
             fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str),
                                     y=yearly["Avg Close"],
                                     marker_color=ACCENT, name="Mean Value"))
-            fig7.update_layout(**base_layout(360, "Macro Annual Mean Close Allocation Values", override_yaxis=dict(tickprefix="$")),
-                               xaxis=dict(gridcolor=GRID_COL))
+            # FIX: Layout adjustments passed directly inside base_layout to prevent double keyword assignment
+            fig7.update_layout(**base_layout(360, "Macro Annual Mean Close Allocation Values", override_yaxis=dict(tickprefix="$")))
             st.plotly_chart(fig7, use_container_width=True)
         else:
             empty_state("📅", "Insufficient timeline depth to isolate macro vectors.")
@@ -993,8 +993,7 @@ with tab3:
                                   fillcolor="rgba(91,141,238,0.18)"))
             months_ok += 1
         if months_ok:
-            fig8.update_layout(**base_layout(360, "Seasonality Structural Distribution Matrices", override_yaxis=dict(tickprefix="$")),
-                               showlegend=False)
+            fig8.update_layout(**base_layout(360, "Seasonality Structural Distribution Matrices"), showlegend=False)
             st.plotly_chart(fig8, use_container_width=True)
         else:
             empty_state("📅", "Seasonality parameters failed initialization.")
@@ -1007,8 +1006,10 @@ with tab3:
             fig9 = go.Figure(go.Histogram(x=ret_data, nbinsx=60,
                                           marker_color=ACCENT, opacity=0.8,
                                           name="Return Vector"))
-            fig9.update_layout(**base_layout(340, "Asymmetrical Daily Return Volatility Distribution (%)", override_xaxis=dict(ticksuffix="%")),
-                               bargap=0.02)
+            # FIX: Layout values safe from double unpacking
+            layout_tmp = base_layout(340, "Asymmetrical Daily Return Volatility Distribution (%)")
+            layout_tmp["xaxis"].update(ticksuffix="%")
+            fig9.update_layout(**layout_tmp, bargap=0.02)
             st.plotly_chart(fig9, use_container_width=True)
         else:
             empty_state("📉", "Variance width contains zero values.")
@@ -1025,8 +1026,10 @@ with tab3:
                 name="Intraday Divergence",
                 hovertemplate="Open: $%{x:.2f}<br>Close: $%{y:.2f}<extra></extra>",
             ))
+            # FIX: Completely removed separate manual xaxis/yaxis keyword definitions to bypass clash
             fig10.update_layout(
-                **base_layout(340, "Opening vs Closing Vector Scaling", override_xaxis=dict(tickprefix="$"), override_yaxis=dict(tickprefix="$"))
+                **base_layout(340, "Opening vs Closing Vector Scaling", 
+                              override_yaxis=dict(tickprefix="$", gridcolor=GRID_COL))
             )
             st.plotly_chart(fig10, use_container_width=True)
         else:

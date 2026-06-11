@@ -308,7 +308,6 @@ def load_model_cached(file_id: str):
     download_url = f"https://drive.google.com/uc?id={file_id}"
     tmp_path     = os.path.join(tempfile.gettempdir(), f"tsla_model_{file_id[:8]}.keras")
 
-    # Only re-download if file doesn't exist yet (avoids repeated downloads on re-runs)
     if not os.path.exists(tmp_path):
         result = gdown.download(download_url, tmp_path, quiet=True, fuzzy=True)
         if result is None or not os.path.exists(tmp_path):
@@ -320,7 +319,6 @@ def load_model_cached(file_id: str):
     try:
         model = tf.keras.models.load_model(tmp_path)
     except Exception as e:
-        # Remove corrupted file so next attempt re-downloads
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         raise RuntimeError(f"Model file downloaded but could not be loaded: {e}")
@@ -329,11 +327,7 @@ def load_model_cached(file_id: str):
 
 
 def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
-    """
-    Recursive multi-step forecast seeded from the last LOOKBACK days.
-    Returns (dates, predicted_prices, lower_band, upper_band).
-    Raises ValueError with a clear message on any failure.
-    """
+    """Recursive multi-step forecast seeded from the last LOOKBACK days."""
     adj_col = df[["Adj Close"]].dropna()
     if len(adj_col) < LOOKBACK:
         raise ValueError(
@@ -348,7 +342,6 @@ def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
     for _ in range(n_days):
         x   = np.array(seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
         out = float(model.predict(x, verbose=0)[0, 0])
-        # Clip to [0, 1] — scaled predictions should never escape this range
         out = np.clip(out, 0.0, 1.0)
         preds_scaled.append(out)
         seed.append(out)
@@ -357,11 +350,10 @@ def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
         np.array(preds_scaled, dtype=np.float32).reshape(-1, 1)
     ).flatten()
 
-    # Confidence band: proportional to historical 60-day rolling volatility × √t
     recent_ret  = df["DailyReturn"].replace([np.inf, -np.inf], np.nan).dropna().tail(60)
     daily_vol   = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
     t_arr       = np.arange(1, n_days + 1)
-    band_frac   = np.clip(daily_vol * np.sqrt(t_arr), 0, 0.5)  # cap at 50%
+    band_frac   = np.clip(daily_vol * np.sqrt(t_arr), 0, 0.5)
     lower       = preds_prices * (1 - band_frac)
     upper       = preds_prices * (1 + band_frac)
 
@@ -378,16 +370,13 @@ def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
 with st.spinner("Loading TSLA data…"):
     df, data_warnings = load_data()
 
-# Fatal: no data at all
 if df.empty:
     st.error("⛔ " + (data_warnings[0] if data_warnings else "Unknown data error."))
     st.stop()
 
-# Non-fatal warnings (yfinance offline, missing Adj Close, etc.)
 for w in data_warnings:
     st.warning(f"⚠️ {w}")
 
-# Safe price helpers — guard against < 2 rows
 if len(df) >= 2:
     current_price  = safe_float(df["Close"].iloc[-1])
     prev_price     = safe_float(df["Close"].iloc[-2], fallback=current_price)
@@ -398,7 +387,6 @@ else:
 price_change   = current_price - prev_price
 price_change_p = (price_change / prev_price * 100) if prev_price != 0 else 0.0
 
-# Build scaler once
 try:
     scaler = build_scaler(df)
     scaler_ok = True
@@ -411,22 +399,22 @@ except Exception as _scaler_err:
 # ║                    SIDEBAR                               ║
 # ╚══════════════════════════════════════════════════════════╝
 
+# FIX: Moved this variable retrieval to the top before the sidebar UI draws it
+secret_url = get_secret_model_link()
+
 with st.sidebar:
     st.markdown("## ⚡ TSLA Hub")
     st.markdown("---")
 
     st.markdown('<p class="section-header">Model Engine Status</p>', unsafe_allow_html=True)
-    # Fallback/Override Input: Populated with secret by default so it's hidden/clean
     gdrive_url = st.text_input(
         "Model Resource Node",
         value=secret_url,
-        type="password",  # Masks your file ID/link from public viewers
+        type="password",
         help="Pre-loaded securely from Streamlit Cloud Secrets. Change only for manual model overrides.",
     )
     load_btn = st.button("⬇ Load Model", use_container_width=True, type="primary")
 
-    # Model status indicator
-    # Persistent status layout slot
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
         model_status_slot.success("🟢 Systems Operational (Model Live)")
@@ -446,14 +434,13 @@ with st.sidebar:
     st.markdown("---")
     st.caption(f"Data Source: Live Yahoo Finance Wrapper | Node: Streamlit Cloud Engine")
   
-# Run automated data/model linkage immediately on page render
+# Automated backdrop model loader hook on execution mount
 if not st.session_state.get("model_loaded", False):
     url_to_load = gdrive_url.strip() if gdrive_url else secret_url.strip()
     if url_to_load:
         file_id = extract_gdrive_id(url_to_load)
         if file_id:
             try:
-                # Triggers your cached download and local .keras memory loading
                 _m = load_model_cached(file_id)
                 st.session_state["model_obj"] = _m
                 st.session_state["model_loaded"] = True
@@ -462,11 +449,7 @@ if not st.session_state.get("model_loaded", False):
                 st.session_state["model_loaded"] = False
                 st.sidebar.error(f"❌ Core Initialization Fault: {e}")
 
-# ╔══════════════════════════════════════════════════════════╗
-# ║                    MODEL LOADING                         ║
-# ╚══════════════════════════════════════════════════════════╝
-
-# Attempt model load when button pressed
+# Manual manual button override hook execution logic
 if load_btn:
     url_clean = gdrive_url.strip() if gdrive_url else ""
     if not url_clean:
@@ -474,10 +457,7 @@ if load_btn:
     else:
         file_id = extract_gdrive_id(url_clean)
         if file_id is None:
-            st.sidebar.error(
-                "❌ Could not extract a file ID from that URL. "
-                "Make sure it's a standard Google Drive sharing link."
-            )
+            st.sidebar.error("❌ Could not extract a file ID from that URL.")
         else:
             with st.sidebar:
                 with st.spinner("Downloading model…"):
@@ -490,12 +470,8 @@ if load_btn:
                         st.session_state["model_loaded"] = False
                         st.error(f"❌ {_me}")
 
-# Retrieve model from session (persists across reruns)
-# Map active binary from session memory state down to your prediction engines
+# FIX: Stripped duplicate assignments down to clean singular instances
 model = st.session_state.get("model_obj", None)
-eff_entry = entry_price if entry_price > 0.0 else current_price
-
-# Effective entry price
 eff_entry = entry_price if entry_price > 0.0 else current_price
 
 
@@ -548,7 +524,6 @@ tab1, tab2, tab3 = st.tabs(["📡  Trade Signals", "🔮  Forecast", "📊  Visu
 # ════════════════════════════════════════════════════════════
 with tab1:
 
-    # ── Safe indicator reads ─────────────────────────────────
     def last_valid(series, fallback=np.nan):
         s = series.dropna()
         return safe_float(s.iloc[-1], fallback) if not s.empty else fallback
@@ -561,8 +536,6 @@ with tab1:
     bb_up    = last_valid(df["BB_Upper"])
     bb_lo    = last_valid(df["BB_Lower"])
 
-    # ── Technical scoring ────────────────────────────────────
-    # Each indicator: +1 bullish, -1 bearish, 0 neutral / N/A
     tech_scores: dict[str, int] = {}
 
     if not np.isnan(rsi_now):
@@ -587,7 +560,6 @@ with tab1:
     else:
         tech_scores["Bollinger Band"] = 0
 
-    # ── Model-based signal (optional) ────────────────────────
     model_target_price: float | None = None
     model_signal_score = 0
     model_signal_error = None
@@ -610,10 +582,9 @@ with tab1:
     elif total_score <= -2: signal_label, signal_css = "SELL", "signal-sell"
     else:                   signal_label, signal_css = "HOLD", "signal-hold"
 
-    # ── Risk / Reward maths ──────────────────────────────────
     stop_loss    = eff_entry * (1 - risk_pct / 100)
-    risk_per_sh  = max(eff_entry - stop_loss, 0.01)   # guard /0
-    take_profit  = eff_entry + risk_per_sh * 2.0       # 1:2 R/R
+    risk_per_sh  = max(eff_entry - stop_loss, 0.01)
+    take_profit  = eff_entry + risk_per_sh * 2.0
     max_loss     = risk_per_sh * position_qty
     max_gain     = (take_profit - eff_entry) * position_qty
     model_gain   = ((model_target_price - eff_entry) * position_qty
@@ -621,7 +592,6 @@ with tab1:
     implied_rr   = ((model_target_price - eff_entry) / risk_per_sh
                     if model_target_price is not None else None)
 
-    # ── Layout ───────────────────────────────────────────────
     left, right = st.columns([1, 2], gap="large")
 
     with left:
@@ -708,7 +678,6 @@ with tab1:
                     unsafe_allow_html=True,
                 )
 
-        # ── Price + trade levels chart ───────────────────────
         st.markdown('<p class="section-header">Recent Price vs Trade Levels</p>',
                     unsafe_allow_html=True)
 
@@ -765,12 +734,11 @@ with tab1:
 #  TAB 2 — FORECAST
 # ════════════════════════════════════════════════════════════
 with tab2:
-
     if model is None:
         empty_state(
             "🔮",
-            "Paste your Google Drive model link in the sidebar and click <strong>⬇ Load Model</strong>.<br>"
-            "Once loaded, the CNN-GRU model will forecast up to 60 trading days ahead.",
+            "Your CNN-GRU engine is loading in the background via Streamlit Secrets. "
+            "If it takes more than a minute, ensure your secret token properties are matched.",
         )
     elif not scaler_ok:
         empty_state("⚠️", "Scaler could not be initialised. Check data warnings above.")
@@ -789,13 +757,10 @@ with tab2:
         if not forecast_ok:
             empty_state("⛔", f"Forecast failed: {forecast_err}")
         else:
-            # Guard against NaN/inf in forecast arrays
             if np.any(~np.isfinite(f_prices)):
                 empty_state(
                     "⚠️",
-                    "Forecast produced invalid values (NaN / Inf). "
-                    "This usually means the model weights are incompatible with the input shape. "
-                    "Please verify the model file.",
+                    "Forecast produced invalid values (NaN / Inf). Verified network dimensions.",
                 )
             else:
                 f_end     = safe_float(f_prices[-1])
@@ -805,7 +770,6 @@ with tab2:
                 f_end_lo  = safe_float(f_lower[-1])
                 f_end_hi  = safe_float(f_upper[-1])
 
-                # ── Summary cards ─────────────────────────────
                 c1, c2, c3, c4 = st.columns(4)
                 chg_cls   = "metric-delta-up" if f_chg_pct >= 0 else "metric-delta-down"
                 chg_arrow = "▲" if f_chg_pct >= 0 else "▼"
@@ -828,19 +792,15 @@ with tab2:
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # ── Forecast chart ────────────────────────────
                 hist_win = df[["Adj Close"]].tail(120).dropna()
-
                 fig_fc = go.Figure()
 
-                # Historical line
                 fig_fc.add_trace(go.Scatter(
                     x=hist_win.index, y=hist_win["Adj Close"],
                     name="Historical", line=dict(color=ACCENT, width=2),
                     hovertemplate="<b>%{x|%d %b %Y}</b><br>Close: $%{y:.2f}<extra></extra>",
                 ))
 
-                # Confidence band (polygon fill)
                 band_x = list(f_dates) + list(f_dates[::-1])
                 band_y = list(f_upper) + list(f_lower[::-1])
                 fig_fc.add_trace(go.Scatter(
@@ -850,7 +810,6 @@ with tab2:
                     name="Confidence Band", hoverinfo="skip",
                 ))
 
-                # Forecast line with per-point hover
                 fig_fc.add_trace(go.Scatter(
                     x=f_dates, y=f_prices,
                     name="Forecast",
@@ -870,7 +829,6 @@ with tab2:
                     ),
                 ))
 
-                # "Today" divider
                 fig_fc.add_vline(
                     x=df.index[-1],
                     line_color=MUTED, line_dash="dash", line_width=1,
@@ -890,7 +848,6 @@ with tab2:
                     "Not financial advice — past performance does not predict future results."
                 )
 
-                # ── Forecast table ────────────────────────────
                 with st.expander("📋 View full forecast table"):
                     fc_rows = []
                     for i, (d, p, lo, hi) in enumerate(
@@ -913,8 +870,6 @@ with tab2:
 #  TAB 3 — VISUALIZATIONS
 # ════════════════════════════════════════════════════════════
 with tab3:
-
-    # ── Date range filter ────────────────────────────────────
     fa, fb = st.columns(2)
     with fa:
         viz_start = st.date_input(
@@ -944,11 +899,9 @@ with tab3:
 
     st.markdown("---")
 
-    # ── Plot helper: skip trace if all-NaN ───────────────────
     def has_data(series) -> bool:
         return series.notna().any()
 
-    # ── Row 1: Price + MAs  |  Volume ────────────────────────
     r1a, r1b = st.columns([3, 2])
 
     with r1a:
@@ -981,7 +934,6 @@ with tab3:
                            yaxis=dict(gridcolor=GRID_COL))
         st.plotly_chart(fig2, use_container_width=True)
 
-    # ── Row 2: Candlestick + BB  |  Spread ───────────────────
     r2a, r2b = st.columns([3, 2])
 
     with r2a:
@@ -1018,7 +970,6 @@ with tab3:
         else:
             empty_state("📉", "Spread data unavailable for this range.")
 
-    # ── Row 3: MACD  |  RSI ──────────────────────────────────
     r3a, r3b = st.columns(2)
 
     with r3a:
@@ -1062,7 +1013,6 @@ with tab3:
         else:
             empty_state("📉", "RSI data not available for this date range.")
 
-    # ── Row 4: Annual avg  |  Monthly box ────────────────────
     r4a, r4b = st.columns(2)
 
     with r4a:
@@ -1101,7 +1051,6 @@ with tab3:
         else:
             empty_state("📅", "Not enough monthly data to draw box plots.")
 
-    # ── Row 5: Returns hist  |  Open vs Close scatter ────────
     r5a, r5b = st.columns(2)
 
     with r5a:
@@ -1139,7 +1088,6 @@ with tab3:
         else:
             empty_state("📉", "Not enough data for scatter plot.")
 
-    # ── Row 6: Correlation heatmap ────────────────────────────
     st.markdown('<p class="section-header">Feature Correlation Heatmap</p>',
                 unsafe_allow_html=True)
 

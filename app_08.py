@@ -673,7 +673,7 @@ with t3:
         fig_adv_reg = go.Figure()
         fig_adv_reg.add_trace(go.Scatter(x=dv.index, y=dv["Close"], line=dict(color=MUTED, width=1), name="History"))
         fig_adv_reg.add_trace(go.Scatter(x=f_dates, y=f_prices, line=dict(color=GREEN, width=2), name="Horizon Core Node Matrix"))
-        fig_adv_reg.update_layout(**base_layout(320, "Advanced Analytic 2: Long-Term Horizon Regime Projections Grid"), override_yaxis=dict(tickprefix="$"))
+        fig_adv_reg.update_layout(**base_layout(320, "Advanced Analytic 2: Long-Term Horizon Regime Projections Grid", override_yaxis=dict(tickprefix="$")))
         st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
         st.plotly_chart(fig_adv_reg, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)

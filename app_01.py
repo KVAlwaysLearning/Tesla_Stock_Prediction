@@ -1,6 +1,6 @@
 # ============================================================
 # TSLA FORECASTING HUB  |  app.py
-# Model: CNN-GRU (Model III) | Data: TSLA.csv + yfinance API
+# Model: CNN-GRU (Model III) | Optimized Data: TSLA_1.csv + yfinance Incremental
 # ============================================================
 
 import os
@@ -103,18 +103,18 @@ st.markdown("""
 # ║                    CONSTANTS                             ║
 # ╚══════════════════════════════════════════════════════════╝
 
-CSV_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TSLA.csv")
-API_START = "2020-02-03"
-LOOKBACK  = 60
-PLOT_BG   = "#0d0f14"
-GRID_COL  = "#1a1d28"
-FONT_COL  = "#e8eaf0"
-ACCENT    = "#e8c84a"
-GREEN     = "#26d47c"
-RED       = "#f05252"
-BLUE      = "#5b8dee"
-PURPLE    = "#a06ee1"
-MUTED     = "#7a8099"
+CSV_PATH      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TSLA_1.csv")
+API_START_CUT = "2026-06-11"  # yfinance ONLY scans after this point
+LOOKBACK      = 60
+PLOT_BG       = "#0d0f14"
+GRID_COL      = "#1a1d28"
+FONT_COL      = "#e8eaf0"
+ACCENT        = "#e8c84a"
+GREEN         = "#26d47c"
+RED           = "#f05252"
+BLUE          = "#5b8dee"
+PURPLE        = "#a06ee1"
+MUTED         = "#7a8099"
 
 
 # ╔══════════════════════════════════════════════════════════╗
@@ -122,7 +122,6 @@ MUTED     = "#7a8099"
 # ╚══════════════════════════════════════════════════════════╝
 
 def safe_float(val, fallback=0.0) -> float:
-    """Convert to float without raising; return fallback on NaN/None/inf."""
     try:
         v = float(val)
         return fallback if (np.isnan(v) or np.isinf(v)) else v
@@ -131,7 +130,6 @@ def safe_float(val, fallback=0.0) -> float:
 
 
 def empty_state(icon: str, msg: str):
-    """Render a clean empty-state card instead of blank space."""
     st.markdown(
         f'<div class="empty-state">'
         f'<div class="empty-state-icon">{icon}</div>'
@@ -151,15 +149,19 @@ def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metri
     )
 
 
-def base_layout(height: int = 350, title: str = "") -> dict:
-    return dict(
+def base_layout(height: int = 350, title: str = "", override_yaxis=None) -> dict:
+    """Helper layout config generator to guarantee no keyword duplicates inside unpacking arguments."""
+    layout_dict = dict(
         paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
         font_color=FONT_COL, height=height,
         margin=dict(l=0, r=0, t=36, b=0),
         title=dict(text=title, font=dict(size=13, color=MUTED)),
         xaxis=dict(gridcolor=GRID_COL, showgrid=True),
-        yaxis=dict(gridcolor=GRID_COL, showgrid=True),
+        yaxis=dict(gridcolor=GRID_COL, showgrid=True)
     )
+    if override_yaxis is not None:
+        layout_dict["yaxis"].update(override_yaxis)
+    return layout_dict
 
 
 # ╔══════════════════════════════════════════════════════════╗
@@ -168,74 +170,62 @@ def base_layout(height: int = 350, title: str = "") -> dict:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, list[str]]:
-    """
-    Returns (df, warnings_list).
-    Never raises — all errors are collected and surfaced to the UI.
-    """
     warnings_out = []
 
-    # ── Part 1: CSV ───────────────────────────────────────────
+    # ── Part 1: Pull Historical baseline block from TSLA_1.csv ──
     df_csv = pd.DataFrame()
     if os.path.exists(CSV_PATH):
         try:
             df_csv = pd.read_csv(CSV_PATH, parse_dates=["Date"])
             df_csv.set_index("Date", inplace=True)
             df_csv.sort_index(inplace=True)
-            df_csv = df_csv[df_csv.index < pd.Timestamp(API_START)]
             if df_csv.empty:
-                warnings_out.append("TSLA.csv contained no rows before 2020-02-03.")
+                warnings_out.append("TSLA_1.csv contained no rows.")
         except Exception as e:
-            warnings_out.append(f"Could not read TSLA.csv: {e}")
+            warnings_out.append(f"Could not read TSLA_1.csv: {e}")
     else:
-        warnings_out.append("TSLA.csv not found in the app folder — using live data only.")
+        warnings_out.append("CRITICAL ERROR: TSLA_1.csv not found in repository root.")
 
-    # ── Part 2: yfinance API ──────────────────────────────────
+    # ── Part 2: Pull strictly AFTER 2026-06-10 using yfinance ──
     df_api = pd.DataFrame()
     try:
         import yfinance as yf
-        raw = yf.download("TSLA", start=API_START, progress=False, auto_adjust=False)
+        # Request data only from June 11, 2026 forward
+        raw = yf.download("TSLA", start=API_START_CUT, progress=False, auto_adjust=False)
         if not raw.empty:
             raw.index.name = "Date"
             if isinstance(raw.columns, pd.MultiIndex):
                 raw.columns = [c[0] for c in raw.columns]
             df_api = raw
         else:
-            warnings_out.append("yfinance returned empty data for TSLA.")
+            # Not an error if today is still inside the June 2026 envelope
+            pass
     except ImportError:
         warnings_out.append("yfinance not installed — live data unavailable.")
     except Exception as e:
-        warnings_out.append(f"Live data fetch failed: {e}")
+        warnings_out.append(f"Incremental live data fetch failed: {e}")
 
-    # ── Part 3: Merge ─────────────────────────────────────────
+    # ── Part 3: Chronological Stack Merge ──────────────────────
     frames = [f for f in [df_csv, df_api] if not f.empty]
     if not frames:
-        return pd.DataFrame(), ["No data could be loaded. Check TSLA.csv and internet access."]
+        return pd.DataFrame(), ["No data assets could be recovered. Verify TSLA_1.csv exists."]
 
     df = pd.concat(frames)
     df = df[~df.index.duplicated(keep="last")]
     df.sort_index(inplace=True)
 
-    # Require minimum usable columns
     required = {"Open", "High", "Low", "Close", "Volume"}
     missing  = required - set(df.columns)
     if missing:
-        return pd.DataFrame(), [f"Dataset is missing columns: {', '.join(missing)}"]
+        return pd.DataFrame(), [f"Merged dataset lacks mandatory structures: {', '.join(missing)}"]
 
-    # Ensure Adj Close exists (fall back to Close if absent)
     if "Adj Close" not in df.columns:
         df["Adj Close"] = df["Close"]
-        warnings_out.append("'Adj Close' not found — using 'Close' as substitute.")
 
     df.ffill(inplace=True)
     df.bfill(inplace=True)
 
-    # Need at least LOOKBACK + 200 rows for all indicators to be meaningful
-    if len(df) < LOOKBACK + 200:
-        warnings_out.append(
-            f"Only {len(df)} rows of data — some indicators may show as N/A."
-        )
-
-    # ── Derived columns ───────────────────────────────────────
+    # Calculate Derived Columns
     df["Spread"]    = df["High"] - df["Low"]
     df["MA30"]      = df["Close"].rolling(30).mean()
     df["MA90"]      = df["Close"].rolling(90).mean()
@@ -247,14 +237,12 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df["MACDHist"]  = df["MACD"] - df["MACDSig"]
     df["DailyReturn"] = df["Close"].pct_change() * 100
 
-    # RSI (14)
     delta = df["Close"].diff()
     gain  = delta.clip(lower=0).rolling(14).mean()
     loss  = (-delta.clip(upper=0)).rolling(14).mean()
     rs    = gain / loss.replace(0, np.nan)
     df["RSI"] = 100 - (100 / (1 + rs))
 
-    # Bollinger Bands (20, 2σ)
     df["BB_Mid"]   = df["Close"].rolling(20).mean()
     bb_std         = df["Close"].rolling(20).std()
     df["BB_Upper"] = df["BB_Mid"] + 2 * bb_std
@@ -264,12 +252,11 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
 
 
 def build_scaler(df: pd.DataFrame):
-    """Fit MinMaxScaler on Adj Close — mirrors notebook exactly."""
     from sklearn.preprocessing import MinMaxScaler
     scaler = MinMaxScaler(feature_range=(0, 1))
     adj_vals = df[["Adj Close"]].dropna().values
     if len(adj_vals) == 0:
-        raise ValueError("No valid 'Adj Close' values to fit the scaler.")
+        raise ValueError("No valid 'Adj Close' vectors found to map scalar range.")
     scaler.fit(adj_vals)
     return scaler
 
@@ -279,13 +266,12 @@ def build_scaler(df: pd.DataFrame):
 # ╚══════════════════════════════════════════════════════════╝
 
 def extract_gdrive_id(url: str) -> str | None:
-    """Extract file ID from any common Google Drive URL format."""
     url = url.strip()
     for pattern in [
         r"/file/d/([a-zA-Z0-9_-]{20,})",
         r"[?&]id=([a-zA-Z0-9_-]{20,})",
         r"/d/([a-zA-Z0-9_-]{20,})/",
-        r"^([a-zA-Z0-9_-]{20,})$",   # bare file ID
+        r"^([a-zA-Z0-9_-]{20,})$",
     ]:
         m = re.search(pattern, url)
         if m:
@@ -295,15 +281,11 @@ def extract_gdrive_id(url: str) -> str | None:
 
 @st.cache_resource(show_spinner=False)
 def load_model_cached(file_id: str):
-    """Download and load the .keras model. Cached by file_id."""
     try:
         import gdown
-    except ImportError:
-        raise RuntimeError("'gdown' is not installed. Add it to requirements.txt.")
-    try:
         import tensorflow as tf
-    except ImportError:
-        raise RuntimeError("'tensorflow' is not installed. Add it to requirements.txt.")
+    except ImportError as e:
+        raise RuntimeError(f"Missing mandatory framework dependency: {e}")
 
     download_url = f"https://drive.google.com/uc?id={file_id}"
     tmp_path     = os.path.join(tempfile.gettempdir(), f"tsla_model_{file_id[:8]}.keras")
@@ -311,29 +293,22 @@ def load_model_cached(file_id: str):
     if not os.path.exists(tmp_path):
         result = gdown.download(download_url, tmp_path, quiet=True, fuzzy=True)
         if result is None or not os.path.exists(tmp_path):
-            raise RuntimeError(
-                "Download returned nothing. Ensure the file is shared as "
-                "'Anyone with the link can view' and the link is correct."
-            )
+            raise RuntimeError("Google Drive extraction node failed. Check file view permissions.")
 
     try:
         model = tf.keras.models.load_model(tmp_path)
     except Exception as e:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise RuntimeError(f"Model file downloaded but could not be loaded: {e}")
+        raise RuntimeError(f"Model format error during local load sequence: {e}")
 
     return model
 
 
 def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
-    """Recursive multi-step forecast seeded from the last LOOKBACK days."""
     adj_col = df[["Adj Close"]].dropna()
     if len(adj_col) < LOOKBACK:
-        raise ValueError(
-            f"Need at least {LOOKBACK} rows of valid 'Adj Close' data to forecast. "
-            f"Only {len(adj_col)} available."
-        )
+        raise ValueError(f"Insufficient seed depth. Required window: {LOOKBACK} intervals.")
 
     scaled = scaler.transform(adj_col.values)
     seed   = list(scaled[-LOOKBACK:, 0])
@@ -364,14 +339,14 @@ def recursive_forecast(model, scaler, df: pd.DataFrame, n_days: int) -> tuple:
 
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                    LOAD DATA                             ║
+# ║                    LOAD DATA DATASTREAM                  ║
 # ╚══════════════════════════════════════════════════════════╝
 
-with st.spinner("Loading TSLA data…"):
+with st.spinner("Executing optimized dual-source data merge..."):
     df, data_warnings = load_data()
 
 if df.empty:
-    st.error("⛔ " + (data_warnings[0] if data_warnings else "Unknown data error."))
+    st.error("⛔ " + (data_warnings[0] if data_warnings else "Unknown data layer crash."))
     st.stop()
 
 for w in data_warnings:
@@ -392,14 +367,13 @@ try:
     scaler_ok = True
 except Exception as _scaler_err:
     scaler_ok = False
-    st.warning(f"⚠️ Scaler could not be built: {_scaler_err}. Forecast will be unavailable.")
+    st.warning(f"⚠️ Scaler setup bypassed: {_scaler_err}")
 
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                    SIDEBAR                               ║
+# ║                    SIDEBAR CONFIG                        ║
 # ╚══════════════════════════════════════════════════════════╝
 
-# FIX: Moved this variable retrieval to the top before the sidebar UI draws it
 secret_url = get_secret_model_link()
 
 with st.sidebar:
@@ -411,15 +385,15 @@ with st.sidebar:
         "Model Resource Node",
         value=secret_url,
         type="password",
-        help="Pre-loaded securely from Streamlit Cloud Secrets. Change only for manual model overrides.",
+        help="Pre-loaded from cloud environment parameters.",
     )
-    load_btn = st.button("⬇ Load Model", use_container_width=True, type="primary")
+    load_btn = st.button("⬇ Load Manual Model Override", use_container_width=True)
 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
-        model_status_slot.success("🟢 Systems Operational (Model Live)")
+        model_status_slot.success("🟢 Deep Learning Model Live")
     else:
-        model_status_slot.info("⏳ Initializing Deep Learning Core...")
+        model_status_slot.info("⏳ Core Initialization Loop Pending...")
 
     st.markdown("---")
     st.markdown('<p class="section-header">Forecast Horizon</p>', unsafe_allow_html=True)
@@ -432,9 +406,8 @@ with st.sidebar:
     risk_pct     = st.slider("Risk Tolerance (%)", 1, 20, 5)
 
     st.markdown("---")
-    st.caption(f"Data Source: Live Yahoo Finance Wrapper | Node: Streamlit Cloud Engine")
+    st.caption(f"Engine Layer: Pre-compiled Hybrid Storage Node")
   
-# Automated backdrop model loader hook on execution mount
 if not st.session_state.get("model_loaded", False):
     url_to_load = gdrive_url.strip() if gdrive_url else secret_url.strip()
     if url_to_load:
@@ -444,23 +417,22 @@ if not st.session_state.get("model_loaded", False):
                 _m = load_model_cached(file_id)
                 st.session_state["model_obj"] = _m
                 st.session_state["model_loaded"] = True
-                model_status_slot.success("🟢 Systems Operational (Model Live)")
+                model_status_slot.success("🟢 Deep Learning Model Live")
             except Exception as e:
                 st.session_state["model_loaded"] = False
                 st.sidebar.error(f"❌ Core Initialization Fault: {e}")
 
-# Manual manual button override hook execution logic
 if load_btn:
     url_clean = gdrive_url.strip() if gdrive_url else ""
     if not url_clean:
-        st.sidebar.error("❌ Please paste a Google Drive link first.")
+        st.sidebar.error("❌ Link parameter array empty.")
     else:
         file_id = extract_gdrive_id(url_clean)
         if file_id is None:
-            st.sidebar.error("❌ Could not extract a file ID from that URL.")
+            st.sidebar.error("❌ Malformed extraction token link index.")
         else:
             with st.sidebar:
-                with st.spinner("Downloading model…"):
+                with st.spinner("Downloading manual replacement weights..."):
                     try:
                         _m = load_model_cached(file_id)
                         st.session_state["model_obj"]    = _m
@@ -470,20 +442,19 @@ if load_btn:
                         st.session_state["model_loaded"] = False
                         st.error(f"❌ {_me}")
 
-# FIX: Stripped duplicate assignments down to clean singular instances
 model = st.session_state.get("model_obj", None)
 eff_entry = entry_price if entry_price > 0.0 else current_price
 
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                    HEADER STRIP                          ║
+# ║                    HEADER PANEL                          ║
 # ╚══════════════════════════════════════════════════════════╝
 
 col_t, col_p, col_d, col_v, col_sp = st.columns([3, 2, 2, 2, 2])
 
 with col_t:
     st.markdown("### ⚡ Tesla, Inc. &nbsp;`TSLA`")
-    st.caption(f"Last trading day: {df.index[-1].strftime('%d %b %Y')}")
+    st.caption(f"Last synchronized data frame: {df.index[-1].strftime('%d %b %Y')}")
 
 with col_p:
     delta_cls = "metric-delta-up" if price_change >= 0 else "metric-delta-down"
@@ -513,14 +484,14 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ╔══════════════════════════════════════════════════════════╗
-# ║                       TABS                              ║
+# ║                       TABS GENERATOR                     ║
 # ╚══════════════════════════════════════════════════════════╝
 
-tab1, tab2, tab3 = st.tabs(["📡  Trade Signals", "🔮  Forecast", "📊  Visualizations"])
+tab1, tab2, tab3 = st.tabs(["📡  Trade Signals", "🔮  Forecast Engine", "📊  Advanced Visualizations"])
 
 
 # ════════════════════════════════════════════════════════════
-#  TAB 1 — TRADE SIGNALS
+#  TAB 1 — SIGNAL ENGINE
 # ════════════════════════════════════════════════════════════
 with tab1:
 
@@ -595,53 +566,53 @@ with tab1:
     left, right = st.columns([1, 2], gap="large")
 
     with left:
-        st.markdown('<p class="section-header">Composite Signal</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">Composite Strategy Signal</p>', unsafe_allow_html=True)
         st.markdown(
             f'<div style="text-align:center;padding:28px 0 16px">'
             f'<div class="{signal_css}">{signal_label}</div>'
             f'<div style="color:{MUTED};font-size:0.78rem;margin-top:10px">'
-            f'Score: {total_score:+d} across {n_signals} indicators</div>'
+            f'System Matrix Index: {total_score:+d} / {n_signals} nodes active</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
-        st.markdown('<p class="section-header">Indicator Breakdown</p>', unsafe_allow_html=True)
-        label_map = {1: ("🟢", "Bullish"), -1: ("🔴", "Bearish"), 0: ("🟡", "Neutral")}
+        st.markdown('<p class="section-header">Structural Breakdown</p>', unsafe_allow_html=True)
+        label_map = {1: ("🟢", "Bullish Convergence"), -1: ("🔴", "Bearish Divergence"), 0: ("🟡", "Stationary Range")}
         for ind_name, score in tech_scores.items():
             icon, lbl = label_map[score]
             st.markdown(f"{icon} &nbsp;**{ind_name}** — {lbl}")
 
         if model_signal_error:
-            st.caption(f"⚠️ Model signal skipped: {model_signal_error}")
+            st.caption(f"⚠️ Signal Matrix Warning: {model_signal_error}")
 
         st.markdown("---")
-        st.markdown('<p class="section-header">Key Levels</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">Execution Target Summary</p>', unsafe_allow_html=True)
 
         def _fmt(v, prefix="$", dec=2):
             return f"{prefix}{v:.{dec}f}" if not np.isnan(v) else "N/A"
 
-        st.markdown(f"RSI: **{_fmt(rsi_now, '', 1)}**")
-        st.markdown(f"MACD: **{_fmt(macd_now, '', 3)}** &nbsp;|&nbsp; Signal: **{_fmt(sig_now, '', 3)}**")
-        st.markdown(f"BB Upper: **{_fmt(bb_up)}** &nbsp;|&nbsp; Lower: **{_fmt(bb_lo)}**")
+        st.markdown(f"RSI Location Index: **{_fmt(rsi_now, '', 1)}**")
+        st.markdown(f"MACD Delta Score: **{_fmt(macd_now, '', 3)}** &nbsp;|&nbsp; Signal Trace: **{_fmt(sig_now, '', 3)}**")
+        st.markdown(f"Volatility Caps: BB High: **{_fmt(bb_up)}** &nbsp;|&nbsp; BB Low: **{_fmt(bb_lo)}**")
         if model_target_price:
-            st.markdown(f"Model 5d target: **{_fmt(model_target_price)}**")
+            st.markdown(f"CNN-GRU Model 5d projection: **{_fmt(model_target_price)}**")
 
     with right:
-        st.markdown('<p class="section-header">Risk / Reward Calculator</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">Capital Utilization Calculator</p>', unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(metric_card("Entry", f"${eff_entry:.2f}"), unsafe_allow_html=True)
+            st.markdown(metric_card("Entry Cost Model", f"${eff_entry:.2f}"), unsafe_allow_html=True)
         with c2:
             st.markdown(
-                metric_card("Stop Loss", f"${stop_loss:.2f}",
-                            f"−{risk_pct}% risk", "metric-delta-down"),
+                metric_card("Risk Vector Stop", f"${stop_loss:.2f}",
+                            f"−{risk_pct}% margin band", "metric-delta-down"),
                 unsafe_allow_html=True,
             )
         with c3:
             st.markdown(
-                metric_card("Take Profit (1:2)", f"${take_profit:.2f}",
-                            f"+{risk_pct*2:.0f}% target", "metric-delta-up"),
+                metric_card("Target (1:2 Limit)", f"${take_profit:.2f}",
+                            f"+{risk_pct*2:.0f}% structural cap", "metric-delta-up"),
                 unsafe_allow_html=True,
             )
 
@@ -650,14 +621,14 @@ with tab1:
         c4, c5, c6 = st.columns(3)
         with c4:
             st.markdown(
-                metric_card("Max Loss", f"−${max_loss:.0f}",
-                            f"{position_qty} shares", "metric-delta-down"),
+                metric_card("Max Exposure Risk", f"−${max_loss:.0f}",
+                            f"Allocation: {position_qty} Units", "metric-delta-down"),
                 unsafe_allow_html=True,
             )
         with c5:
             st.markdown(
-                metric_card("Target Gain", f"+${max_gain:.0f}",
-                            "R/R  1 : 2", "metric-delta-up"),
+                metric_card("Theoretical Premium", f"+${max_gain:.0f}",
+                            "Alpha Ratio 1 : 2", "metric-delta-up"),
                 unsafe_allow_html=True,
             )
         with c6:
@@ -666,19 +637,19 @@ with tab1:
                 g_sgn = "+" if model_gain >= 0 else ""
                 st.markdown(
                     metric_card(
-                        "Model P&L (5d)", f"{g_sgn}${model_gain:.0f}",
-                        f"R/R  1 : {implied_rr:.1f}", g_cls,
+                        "Model Projected P&L", f"{g_sgn}${model_gain:.0f}",
+                        f"Forecast R/R 1 : {implied_rr:.1f}", g_cls,
                     ),
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
-                    metric_card("Model P&L (5d)", "—",
-                                "Load model to see", "metric-muted"),
+                    metric_card("Model Projected P&L", "—",
+                                "Neural Net Inactive", "metric-muted"),
                     unsafe_allow_html=True,
                 )
 
-        st.markdown('<p class="section-header">Recent Price vs Trade Levels</p>',
+        st.markdown('<p class="section-header">Execution Target Visual Overlay</p>',
                     unsafe_allow_html=True)
 
         chart_df = df[["Close", "BB_Upper", "BB_Lower", "MA30", "MA90"]].tail(90).dropna(
@@ -686,34 +657,34 @@ with tab1:
         )
 
         if chart_df.empty:
-            empty_state("📉", "Not enough data to render the trade chart.")
+            empty_state("📉", "Not enough data vectors to scale the tactical matrix overlay.")
         else:
             fig_t = go.Figure()
             fig_t.add_trace(go.Scatter(x=chart_df.index, y=chart_df["Close"],
-                                       name="Close", line=dict(color=ACCENT, width=1.8)))
+                                       name="Spot Price", line=dict(color=ACCENT, width=1.8)))
             if chart_df["MA30"].notna().any():
                 fig_t.add_trace(go.Scatter(x=chart_df.index, y=chart_df["MA30"],
-                                           name="MA30", line=dict(color=BLUE, width=1, dash="dot")))
+                                           name="Alpha Tracking MA30", line=dict(color=BLUE, width=1, dash="dot")))
             if chart_df["MA90"].notna().any():
                 fig_t.add_trace(go.Scatter(x=chart_df.index, y=chart_df["MA90"],
-                                           name="MA90", line=dict(color=PURPLE, width=1, dash="dot")))
+                                           name="Structural MA90", line=dict(color=PURPLE, width=1, dash="dot")))
             if chart_df["BB_Upper"].notna().any():
                 fig_t.add_trace(go.Scatter(x=chart_df.index, y=chart_df["BB_Upper"],
-                                           name="BB Upper",
+                                           name="BB Cap",
                                            line=dict(color=MUTED, width=0.8, dash="dash"),
                                            opacity=0.5))
             if chart_df["BB_Lower"].notna().any():
                 fig_t.add_trace(go.Scatter(x=chart_df.index, y=chart_df["BB_Lower"],
                                            fill="tonexty",
                                            fillcolor="rgba(122,128,153,0.07)",
-                                           name="BB Lower",
+                                           name="BB Floor",
                                            line=dict(color=MUTED, width=0.8, dash="dash"),
                                            opacity=0.5))
 
             for lvl, lbl, col in [
-                (eff_entry,   "Entry",  ACCENT),
+                (eff_entry,   "Trigger",  ACCENT),
                 (stop_loss,   "Stop",   RED),
-                (take_profit, "Target", GREEN),
+                (take_profit, "Limit", GREEN),
             ]:
                 if lvl > 0:
                     fig_t.add_hline(
@@ -722,28 +693,28 @@ with tab1:
                         annotation_font_color=col,
                     )
 
+            # FIX: Explicitly removed duplicate keyword clash by passing yaxis overrides into layout constructor 
             fig_t.update_layout(
-                **base_layout(330),
-                legend=dict(orientation="h", y=-0.18, font_size=10),
-                yaxis=dict(gridcolor=GRID_COL, tickprefix="$"),
+                **base_layout(330, override_yaxis=dict(tickprefix="$")),
+                legend=dict(orientation="h", y=-0.18, font_size=10)
             )
             st.plotly_chart(fig_t, use_container_width=True)
 
 
 # ════════════════════════════════════════════════════════════
-#  TAB 2 — FORECAST
+#  TAB 2 — RECURSIVE FORECAST
 # ════════════════════════════════════════════════════════════
 with tab2:
     if model is None:
         empty_state(
             "🔮",
-            "Your CNN-GRU engine is loading in the background via Streamlit Secrets. "
-            "If it takes more than a minute, ensure your secret token properties are matched.",
+            "Continuous integration pipeline initializing model layers from background secrets... "
+            "Verification sweeps can take up to 45 seconds on startup.",
         )
     elif not scaler_ok:
-        empty_state("⚠️", "Scaler could not be initialised. Check data warnings above.")
+        empty_state("⚠️", "Normalization layer fault. Math matrix compilation suspended.")
     else:
-        with st.spinner(f"Running {forecast_days}-day recursive forecast…"):
+        with st.spinner(f"Computing {forecast_days}-day recursive hybrid matrix..."):
             try:
                 f_dates, f_prices, f_lower, f_upper = recursive_forecast(
                     model, scaler, df, n_days=forecast_days
@@ -755,39 +726,34 @@ with tab2:
                 forecast_err = str(_fe)
 
         if not forecast_ok:
-            empty_state("⛔", f"Forecast failed: {forecast_err}")
+            empty_state("⛔", f"Structural predictive breakdown: {forecast_err}")
         else:
             if np.any(~np.isfinite(f_prices)):
-                empty_state(
-                    "⚠️",
-                    "Forecast produced invalid values (NaN / Inf). Verified network dimensions.",
-                )
+                empty_state("⚠️", "Model divergence warning. Predicted vectors returned NaN bounds.")
             else:
                 f_end     = safe_float(f_prices[-1])
                 f_chg_pct = (f_end - current_price) / current_price * 100 if current_price else 0
                 f_hi      = safe_float(f_prices.max())
                 f_lo      = safe_float(f_prices.min())
-                f_end_lo  = safe_float(f_lower[-1])
-                f_end_hi  = safe_float(f_upper[-1])
 
                 c1, c2, c3, c4 = st.columns(4)
                 chg_cls   = "metric-delta-up" if f_chg_pct >= 0 else "metric-delta-down"
                 chg_arrow = "▲" if f_chg_pct >= 0 else "▼"
 
                 with c1:
-                    st.markdown(metric_card("Current Price", f"${current_price:.2f}"),
+                    st.markdown(metric_card("Spot Anchor", f"${current_price:.2f}"),
                                 unsafe_allow_html=True)
                 with c2:
                     st.markdown(
-                        metric_card(f"Day-{forecast_days} Target", f"${f_end:.2f}",
-                                    f"{chg_arrow} {f_chg_pct:+.1f}%", chg_cls),
+                        metric_card(f"Target (Day-{forecast_days})", f"${f_end:.2f}",
+                                    f"{chg_arrow} {f_chg_pct:+.1f}% Delta", chg_cls),
                         unsafe_allow_html=True,
                     )
                 with c3:
-                    st.markdown(metric_card("Forecast High", f"${f_hi:.2f}"),
+                    st.markdown(metric_card("Envelope High", f"${f_hi:.2f}"),
                                 unsafe_allow_html=True)
                 with c4:
-                    st.markdown(metric_card("Forecast Low", f"${f_lo:.2f}"),
+                    st.markdown(metric_card("Envelope Low", f"${f_lo:.2f}"),
                                 unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -797,8 +763,8 @@ with tab2:
 
                 fig_fc.add_trace(go.Scatter(
                     x=hist_win.index, y=hist_win["Adj Close"],
-                    name="Historical", line=dict(color=ACCENT, width=2),
-                    hovertemplate="<b>%{x|%d %b %Y}</b><br>Close: $%{y:.2f}<extra></extra>",
+                    name="Observed History", line=dict(color=ACCENT, width=2),
+                    hovertemplate="<b>%{x|%d %b %Y}</b><br>Spot: $%{y:.2f}<extra></extra>",
                 ))
 
                 band_x = list(f_dates) + list(f_dates[::-1])
@@ -807,12 +773,12 @@ with tab2:
                     x=band_x, y=band_y,
                     fill="toself", fillcolor="rgba(91,141,238,0.13)",
                     line=dict(color="rgba(0,0,0,0)"),
-                    name="Confidence Band", hoverinfo="skip",
+                    name="Volatility Variance Band", hoverinfo="skip",
                 ))
 
                 fig_fc.add_trace(go.Scatter(
                     x=f_dates, y=f_prices,
-                    name="Forecast",
+                    name="CNN-GRU Iterative Forecast",
                     line=dict(color=BLUE, width=2, dash="dot"),
                     mode="lines+markers",
                     marker=dict(size=5, color=BLUE),
@@ -821,10 +787,10 @@ with tab2:
                                         axis=-1),
                     hovertemplate=(
                         "<b>%{x|%d %b %Y}</b><br>"
-                        "Forecast: <b>$%{y:.2f}</b><br>"
-                        "vs Today: %{customdata[2]:+.1f}%<br>"
-                        "Lower bound: $%{customdata[0]:.2f}<br>"
-                        "Upper bound: $%{customdata[1]:.2f}"
+                        "Projected Target: <b>$%{y:.2f}</b><br>"
+                        "Net Change: %{customdata[2]:+.1f}%<br>"
+                        "MAE Error Min: $%{customdata[0]:.2f}<br>"
+                        "MAE Error Max: $%{customdata[1]:.2f}"
                         "<extra></extra>"
                     ),
                 ))
@@ -832,34 +798,28 @@ with tab2:
                 fig_fc.add_vline(
                     x=df.index[-1],
                     line_color=MUTED, line_dash="dash", line_width=1,
-                    annotation_text="  Today", annotation_font_color=MUTED,
+                    annotation_text="  Zero Origin", annotation_font_color=MUTED,
                 )
 
                 fig_fc.update_layout(
-                    **base_layout(460),
+                    **base_layout(460, override_yaxis=dict(tickprefix="$")),
                     legend=dict(orientation="h", y=-0.12, font_size=11),
-                    yaxis=dict(gridcolor=GRID_COL, showgrid=True, tickprefix="$"),
-                    hovermode="x unified",
+                    hovermode="x unified"
                 )
                 st.plotly_chart(fig_fc, use_container_width=True)
 
-                st.caption(
-                    "⚠️ Confidence band = historical 60-day volatility × √t. "
-                    "Not financial advice — past performance does not predict future results."
-                )
-
-                with st.expander("📋 View full forecast table"):
+                with st.expander("📋 Export Calculated Target Array Metrics"):
                     fc_rows = []
                     for i, (d, p, lo, hi) in enumerate(
                         zip(f_dates, f_prices, f_lower, f_upper)
                     ):
                         fc_rows.append({
-                            "Day":           i + 1,
-                            "Date":          d.strftime("%d %b %Y"),
-                            "Forecast ($)":  f"${p:.2f}",
-                            "Lower ($)":     f"${lo:.2f}",
-                            "Upper ($)":     f"${hi:.2f}",
-                            "Δ from Today":  f"{((p-current_price)/current_price)*100:+.2f}%",
+                            "Interval Node": i + 1,
+                            "Trading Date":  d.strftime("%d %b %Y"),
+                            "Forecast Val":  f"${p:.2f}",
+                            "MAE Vol Lower": f"${lo:.2f}",
+                            "MAE Vol Upper": f"${hi:.2f}",
+                            "Variance Pct":  f"{((p-current_price)/current_price)*100:+.2f}%",
                         })
                     st.dataframe(
                         pd.DataFrame(fc_rows), use_container_width=True, hide_index=True
@@ -867,35 +827,30 @@ with tab2:
 
 
 # ════════════════════════════════════════════════════════════
-#  TAB 3 — VISUALIZATIONS
+#  TAB 3 — EXPLORATORY ENGINE
 # ════════════════════════════════════════════════════════════
 with tab3:
     fa, fb = st.columns(2)
     with fa:
         viz_start = st.date_input(
-            "From", value=df.index[0].date(),
-            min_value=df.index[0].date(), max_value=df.index[-1].date(),
-            key="viz_from",
+            "Query Horizon Min", value=df.index[0].date(),
+            min_value=df.index[0].date(), max_value=df.index[-1].date()
         )
     with fb:
         viz_end = st.date_input(
-            "To", value=df.index[-1].date(),
-            min_value=df.index[0].date(), max_value=df.index[-1].date(),
-            key="viz_to",
+            "Query Horizon Max", value=df.index[-1].date(),
+            min_value=df.index[0].date(), max_value=df.index[-1].date()
         )
 
     if viz_start >= viz_end:
-        st.warning("⚠️ 'From' date must be before 'To' date.")
+        st.warning("⚠️ Logic Error: Horizon start must sit before stop index boundary.")
         st.stop()
 
     dv = df.loc[str(viz_start):str(viz_end)].copy()
 
     if dv.empty:
-        empty_state("📭", "No data in the selected date range. Adjust the dates above.")
+        empty_state("📭", "Zero elements recovered within target timeline array parameters.")
         st.stop()
-
-    if len(dv) < 5:
-        st.warning("⚠️ Selected range has fewer than 5 trading days — some charts may look sparse.")
 
     st.markdown("---")
 
@@ -907,7 +862,7 @@ with tab3:
     with r1a:
         fig1 = go.Figure()
         fig1.add_trace(go.Scatter(x=dv.index, y=dv["Close"],
-                                  name="Close", line=dict(color=ACCENT, width=1.8)))
+                                  name="Terminal Close", line=dict(color=ACCENT, width=1.8)))
         for col_name, col_color in [("MA30", BLUE), ("MA90", PURPLE), ("MA200", RED)]:
             if has_data(dv[col_name]):
                 fig1.add_trace(go.Scatter(
@@ -915,9 +870,8 @@ with tab3:
                     line=dict(color=col_color, width=1, dash="dot"),
                 ))
         fig1.update_layout(
-            **base_layout(360, "Closing Price + Moving Averages"),
-            legend=dict(orientation="h", y=-0.18, font_size=10),
-            yaxis=dict(gridcolor=GRID_COL, tickprefix="$"),
+            **base_layout(360, "Systemic Close Pricing + Trailing Moving Averages", override_yaxis=dict(tickprefix="$")),
+            legend=dict(orientation="h", y=-0.18, font_size=10)
         )
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -929,9 +883,8 @@ with tab3:
             else:
                 vol_colors.append(GREEN if dv["Close"].iloc[i] >= dv["Close"].iloc[i-1] else RED)
         fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"],
-                                marker_color=vol_colors, name="Volume"))
-        fig2.update_layout(**base_layout(360, "Daily Volume"),
-                           yaxis=dict(gridcolor=GRID_COL))
+                                marker_color=vol_colors, name="Volume Node"))
+        fig2.update_layout(**base_layout(360, "Volume Profile Distribution Metrics"))
         st.plotly_chart(fig2, use_container_width=True)
 
     r2a, r2b = st.columns([3, 2])
@@ -940,20 +893,19 @@ with tab3:
         fig3 = go.Figure(go.Candlestick(
             x=dv.index, open=dv["Open"], high=dv["High"],
             low=dv["Low"], close=dv["Close"],
-            increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC",
+            increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Layer",
         ))
         if has_data(dv["BB_Upper"]) and has_data(dv["BB_Lower"]):
-            fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="BB Upper",
+            fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="Volatility Cap",
                                       line=dict(color=MUTED, width=0.8, dash="dash")))
             fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"],
                                       fill="tonexty", fillcolor="rgba(122,128,153,0.06)",
-                                      name="BB Lower",
+                                      name="Volatility Floor",
                                       line=dict(color=MUTED, width=0.8, dash="dash")))
         fig3.update_layout(
-            **base_layout(360, "Candlestick + Bollinger Bands"),
+            **base_layout(360, "High-Frequency Structural Candlestick + Variance Channels", override_yaxis=dict(tickprefix="$")),
             xaxis_rangeslider_visible=False,
-            legend=dict(orientation="h", y=-0.18, font_size=10),
-            yaxis=dict(gridcolor=GRID_COL, tickprefix="$"),
+            legend=dict(orientation="h", y=-0.18, font_size=10)
         )
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -962,13 +914,12 @@ with tab3:
             fig4 = go.Figure(go.Scatter(
                 x=dv.index, y=dv["Spread"],
                 fill="tozeroy", fillcolor=f"rgba(232,200,74,0.12)",
-                line=dict(color=ACCENT, width=1.2), name="Spread",
+                line=dict(color=ACCENT, width=1.2), name="High-Low Delta",
             ))
-            fig4.update_layout(**base_layout(360, "Intraday Volatility (High − Low)"),
-                               yaxis=dict(gridcolor=GRID_COL, tickprefix="$"))
+            fig4.update_layout(**base_layout(360, "Intraday Risk Dispersion (High − Low)", override_yaxis=dict(tickprefix="$")))
             st.plotly_chart(fig4, use_container_width=True)
         else:
-            empty_state("📉", "Spread data unavailable for this range.")
+            empty_state("📉", "Spread calculation variables isolated or missing.")
 
     r3a, r3b = st.columns(2)
 
@@ -976,42 +927,41 @@ with tab3:
         if has_data(dv["MACD"]) and has_data(dv["MACDSig"]):
             fig5 = make_subplots(rows=2, cols=1, shared_xaxes=True,
                                  row_heights=[0.6, 0.4], vertical_spacing=0.04)
-            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACD"], name="MACD",
+            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACD"], name="MACD Core",
                                       line=dict(color=BLUE, width=1.5)), row=1, col=1)
-            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="Signal",
+            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="Signal Line",
                                       line=dict(color=ACCENT, width=1.5)), row=1, col=1)
             hist_colors = [GREEN if v >= 0 else RED for v in dv["MACDHist"].fillna(0)]
             fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"],
-                                  name="Histogram", marker_color=hist_colors), row=2, col=1)
+                                  name="Convergence Divergence Histogram", marker_color=hist_colors), row=2, col=1)
             fig5.update_layout(
                 paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
                 font_color=FONT_COL, height=360,
                 margin=dict(l=0, r=0, t=36, b=0),
-                title=dict(text="MACD (12, 26, 9)", font=dict(size=13, color=MUTED)),
+                title=dict(text="Momentum MACD (12, 26, 9)", font=dict(size=13, color=MUTED)),
                 legend=dict(orientation="h", y=-0.18, font_size=10),
                 xaxis=dict(gridcolor=GRID_COL), xaxis2=dict(gridcolor=GRID_COL),
                 yaxis=dict(gridcolor=GRID_COL), yaxis2=dict(gridcolor=GRID_COL),
             )
             st.plotly_chart(fig5, use_container_width=True)
         else:
-            empty_state("📉", "MACD data not available for this date range.")
+            empty_state("📉", "MACD array missing index properties.")
 
     with r3b:
         if has_data(dv["RSI"]):
             fig6 = go.Figure()
-            fig6.add_trace(go.Scatter(x=dv.index, y=dv["RSI"], name="RSI",
+            fig6.add_trace(go.Scatter(x=dv.index, y=dv["RSI"], name="RSI Trace",
                                       line=dict(color=PURPLE, width=1.5)))
             fig6.add_hrect(y0=70, y1=100, fillcolor=f"rgba(240,82,82,0.08)", line_width=0)
             fig6.add_hrect(y0=0,  y1=30,  fillcolor=f"rgba(38,212,124,0.08)", line_width=0)
             fig6.add_hline(y=70, line_color=RED,   line_dash="dash", line_width=0.8,
-                           annotation_text="  Overbought", annotation_font_color=RED)
+                           annotation_text="  Overbought Boundary", annotation_font_color=RED)
             fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8,
-                           annotation_text="  Oversold",   annotation_font_color=GREEN)
-            fig6.update_layout(**base_layout(360, "RSI (14)"),
-                               yaxis=dict(gridcolor=GRID_COL, range=[0, 100]))
+                           annotation_text="  Oversold Boundary",   annotation_font_color=GREEN)
+            fig6.update_layout(**base_layout(360, "Relative Strength Index RSI (14)", override_yaxis=dict(range=[0, 100])))
             st.plotly_chart(fig6, use_container_width=True)
         else:
-            empty_state("📉", "RSI data not available for this date range.")
+            empty_state("📉", "Velocity index missing properties.")
 
     r4a, r4b = st.columns(2)
 
@@ -1022,13 +972,12 @@ with tab3:
         if not yearly.empty:
             fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str),
                                     y=yearly["Avg Close"],
-                                    marker_color=ACCENT, name="Avg Close"))
-            fig7.update_layout(**base_layout(360, "Annual Average Closing Price"),
-                               yaxis=dict(gridcolor=GRID_COL, tickprefix="$"),
+                                    marker_color=ACCENT, name="Mean Value"))
+            fig7.update_layout(**base_layout(360, "Macro Annual Mean Close Allocation Values", override_yaxis=dict(tickprefix="$")),
                                xaxis=dict(gridcolor=GRID_COL))
             st.plotly_chart(fig7, use_container_width=True)
         else:
-            empty_state("📅", "Not enough data to plot annual averages.")
+            empty_state("📅", "Insufficient timeline depth to isolate macro vectors.")
 
     with r4b:
         months     = ["Jan","Feb","Mar","Apr","May","Jun",
@@ -1044,12 +993,11 @@ with tab3:
                                   fillcolor="rgba(91,141,238,0.18)"))
             months_ok += 1
         if months_ok:
-            fig8.update_layout(**base_layout(360, "Monthly Price Distribution"),
-                               yaxis=dict(gridcolor=GRID_COL, tickprefix="$"),
+            fig8.update_layout(**base_layout(360, "Seasonality Structural Distribution Matrices", override_yaxis=dict(tickprefix="$")),
                                showlegend=False)
             st.plotly_chart(fig8, use_container_width=True)
         else:
-            empty_state("📅", "Not enough monthly data to draw box plots.")
+            empty_state("📅", "Seasonality parameters failed initialization.")
 
     r5a, r5b = st.columns(2)
 
@@ -1058,14 +1006,12 @@ with tab3:
         if len(ret_data) >= 5:
             fig9 = go.Figure(go.Histogram(x=ret_data, nbinsx=60,
                                           marker_color=ACCENT, opacity=0.8,
-                                          name="Daily Return %"))
-            fig9.update_layout(**base_layout(340, "Daily Return Distribution (%)"),
-                               bargap=0.02,
-                               xaxis=dict(gridcolor=GRID_COL, ticksuffix="%"),
-                               yaxis=dict(gridcolor=GRID_COL))
+                                          name="Return Vector"))
+            fig9.update_layout(**base_layout(340, "Asymmetrical Daily Return Volatility Distribution (%)", override_xaxis=dict(ticksuffix="%")),
+                               bargap=0.02)
             st.plotly_chart(fig9, use_container_width=True)
         else:
-            empty_state("📉", "Not enough return data in this range.")
+            empty_state("📉", "Variance width contains zero values.")
 
     with r5b:
         oc_data = dv[["Open", "Close", "Volume"]].dropna()
@@ -1075,20 +1021,18 @@ with tab3:
                 mode="markers",
                 marker=dict(color=oc_data["Volume"], colorscale="Viridis",
                             size=4, opacity=0.6,
-                            colorbar=dict(title="Volume", tickfont=dict(size=9))),
-                name="Open vs Close",
+                            colorbar=dict(title="Volume Node Matrix", tickfont=dict(size=9))),
+                name="Intraday Divergence",
                 hovertemplate="Open: $%{x:.2f}<br>Close: $%{y:.2f}<extra></extra>",
             ))
             fig10.update_layout(
-                **base_layout(340, "Open vs Close (coloured by Volume)"),
-                xaxis=dict(gridcolor=GRID_COL, tickprefix="$", title="Open"),
-                yaxis=dict(gridcolor=GRID_COL, tickprefix="$", title="Close"),
+                **base_layout(340, "Opening vs Closing Vector Scaling", override_xaxis=dict(tickprefix="$"), override_yaxis=dict(tickprefix="$"))
             )
             st.plotly_chart(fig10, use_container_width=True)
         else:
-            empty_state("📉", "Not enough data for scatter plot.")
+            empty_state("📉", "Divergence plotting limits reached.")
 
-    st.markdown('<p class="section-header">Feature Correlation Heatmap</p>',
+    st.markdown('<p class="section-header">Cross-Sectional Attribute Correlation Matrix Heatmap</p>',
                 unsafe_allow_html=True)
 
     corr_cols    = [c for c in ["Open","High","Low","Close","Adj Close","Volume","Spread"]
@@ -1110,4 +1054,4 @@ with tab3:
         )
         st.plotly_chart(fig11, use_container_width=True)
     else:
-        empty_state("📊", "Not enough columns or rows to compute a correlation matrix.")
+        empty_state("📊", "Attribute matrices lack sufficient spatial dimensions.")

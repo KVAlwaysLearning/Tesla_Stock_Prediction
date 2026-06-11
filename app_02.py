@@ -552,9 +552,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab1, tab2, tab3 = st.tabs(["📡  Trade Signals", "🔮  Forecast Engine", "📊  Advanced Visualizations"])
 
 
-# ════════════════════════════════════════════════════════════
-#  TAB 1 — TRADE SIGNALS
-# ════════════════════════════════════════════════════════════
+# ============================================================
+#  TAB 1 — TRADE SIGNALS (FIXED LAYOUT CLASH)
+# ============================================================
 with tab1:
     rsi_now  = safe_float(df["RSI"].dropna().iloc[-1] if df["RSI"].dropna().any() else np.nan)
     macd_now = safe_float(df["MACD"].dropna().iloc[-1] if df["MACD"].dropna().any() else np.nan)
@@ -607,7 +607,9 @@ with tab1:
         
         fig_t = go.Figure()
         fig_t.add_trace(go.Scatter(x=df.index[-90:], y=df["Close"].tail(90), name="Close", line=dict(color=ACCENT)))
-        fig_t.update_layout(**base_layout(240, "Trailing Context Baseline Evaluation"), yaxis=dict(tickprefix="$"))
+        
+        # FIX: Passed override_yaxis inside base_layout parameters directly to prevent duplication crash
+        fig_t.update_layout(**base_layout(240, "Trailing Context Baseline Evaluation", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig_t, use_container_width=True)
 
 

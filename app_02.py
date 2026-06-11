@@ -708,7 +708,9 @@ with tab3:
         for col, col_color in [("MA30", BLUE), ("MA90", PURPLE), ("MA200", RED)]:
             if col in dv.columns and dv[col].notna().any():
                 fig1.add_trace(go.Scatter(x=dv.index, y=dv[col], name=col, line=dict(color=col_color, width=1, dash="dot")))
-        fig1.update_layout(**base_layout(360, "Systemic Pricing Vectors & Forecast Concat"), yaxis=dict(tickprefix="$"))
+        
+        # FIX: Pass override_yaxis into base_layout directly to prevent duplication crash
+        fig1.update_layout(**base_layout(360, "Systemic Pricing Vectors & Forecast Concat", override_yaxis=dict(tickprefix="$")))
         st.plotly_chart(fig1, use_container_width=True)
 
     with r1b:

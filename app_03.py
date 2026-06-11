@@ -1,12 +1,13 @@
 # ============================================================
 # TSLA FORECASTING HUB  |  app.py
-# Model: Dual-Engine Hybrid (CNN-GRU + Prophet + SARIMAX)
+# Model: Dynamic Iterative Roll (CNN-GRU + Prophet + SARIMAX)
 # ============================================================
 
 import os
 import re
 import warnings
 import tempfile
+import logging
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,8 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 warnings.filterwarnings("ignore")
+logging.getLogger('prophet').setLevel(logging.ERROR)
+logging.getLogger('cmdstanpy').setLevel(logging.ERROR)
 
 secret_url = ""
 try:
@@ -261,152 +264,132 @@ def load_model_cached(file_id: str):
 
     return model
 
-def compute_statistical_trends(hist_df: pd.DataFrame, target_dates: pd.DatetimeIndex) -> np.ndarray:
+def extract_iterative_statistical_trend(history_series: pd.Series, target_dates: pd.DatetimeIndex) -> np.ndarray:
     """
-    Dual Engine Trend Extrapolator: Fits both Prophet and SARIMAX over the historical sequence 
-    to extract seasonal delta variations and completely stop variance collapse / flatlining.
+    Fits Prophet and SARIMAX over the current rolling historical context frame
+    to extract true step deviations, entirely crushing model flatlining/decay.
     """
     try:
         from prophet import Prophet
         from statsmodels.tsa.statespace.sarimax import SARIMAX
     except ImportError:
-        raise RuntimeError("Libraries missing from runtime environment. Verify requirements.txt includes 'prophet' and 'statsmodels'")
+        return np.zeros(len(target_dates))
 
-    steps = len(target_dates)
-    if steps == 0:
+    if len(target_dates) == 0:
         return np.zeros(0)
 
-    # 1. Run Prophet Core Layer (Captures Macro Yearly/Quarterly Waves)
-    pdf = hist_df.reset_index().rename(columns={"Date": "ds", "Adj Close": "y"})
-    # Suppress log notifications from prophet execution
-    import logging
-    logging.getLogger('prophet').setLevel(logging.ERROR)
-    
-    m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
+    # 1. Fit Prophet Layer
+    pdf = history_series.reset_index()
+    pdf.columns = ["ds", "y"]
+    m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
     m_prophet.fit(pdf)
-    
-    future_df = pd.DataFrame({"ds": target_dates})
-    forecast_prophet = m_prophet.predict(future_df)
-    prophet_trend = forecast_prophet["yhat"].values - hist_df.iloc[-1]
+    future = pd.DataFrame({"ds": target_dates})
+    p_out = m_prophet.predict(future)["yhat"].values - history_series.iloc[-1]
 
-    # 2. Run SARIMAX Core Layer (Captures Short-Term Structural Autoregressive Cycles)
+    # 2. Fit SARIMAX Layer
     try:
-        sarimax_model = SARIMAX(hist_df.values, order=(1,1,1), seasonal_order=(1,0,0,5))
-        sarimax_res = sarimax_model.fit(disp=False)
-        sarimax_trend = sarimax_res.forecast(steps=steps) - hist_df.iloc[-1]
+        sarimax_mod = SARIMAX(history_series.values, order=(1,1,1), seasonal_order=(1,0,0,5))
+        s_res = sarimax_mod.fit(disp=False)
+        s_out = s_res.forecast(steps=len(target_dates)) - history_series.iloc[-1]
     except Exception:
-        sarimax_trend = prophet_trend
+        s_out = p_out
 
-    # Blended Output: Equal dynamic weights to prevent overfitting either configuration
-    return (0.50 * prophet_trend) + (0.50 * sarimax_trend)
+    return (0.50 * p_out) + (0.50 * s_out)
 
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     """
-    Advanced Dual-Engine Hybrid Strategy Framework.
-    Combines deep learning loops with fused Prophet + SARIMAX trends.
+    Anti-Decay Recursive Rolling Strategy Engine.
+    Imputes known historical markers and projects future spaces via an updated trend loop.
     """
-    today_marker = pd.Timestamp.now().normalize()
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
-    
     biz_dates = pd.bdate_range(start=target_start, periods=n_days)
+    
     recent_ret = df["DailyReturn"].replace([np.inf, -np.inf], np.nan).dropna().tail(60)
     daily_vol = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
-    
-    preds_prices, lower_bounds, upper_bounds = [], [], []
-    bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
-    
-    # ─── STRATEGY 1: START DATE IS BEFORE TODAY ───
-    if target_start <= today_marker:
-        june_10_marker = pd.Timestamp("2026-06-10")
-        if june_10_marker > db_max_date:
-            june_10_marker = db_max_date
-            
-        one_year_ago = june_10_marker - pd.Timedelta(days=365)
-        hist_1y = df.loc[one_year_ago:june_10_marker, "Adj Close"].resample('B').ffill().dropna()
-        
-        # Calculate dual trend corrections over the entire window
-        trend_deltas = compute_statistical_trends(hist_1y, biz_dates)
 
-        for idx, curr_date in enumerate(biz_dates):
+    preds_prices = []
+    
+    # --- SCENARIO 1: STRATEGY BEGINS INSIDE OR BEFORE STABLE ACTUALS ---
+    if target_start <= db_max_date:
+        for curr_date in biz_dates:
             if curr_date <= db_max_date:
-                hist_match = df.loc[:curr_date]
-                actual_val = float(hist_match["Adj Close"].iloc[-1]) if not hist_match.empty else float(df["Adj Close"].iloc[0])
-                preds_prices.append(actual_val)
+                # Rule: Impute true, absolute actual historic data point
+                preds_prices.append(float(df.loc[curr_date, "Adj Close"]))
             else:
-                lookback_slice = df[df.index < curr_date].tail(LOOKBACK)
-                scaled_seed = list(scaler.transform(lookback_slice[["Adj Close"]].values).flatten())
+                # Step-Ahead Rolling Network Prediction Logic
+                lookback_context = df[df.index < curr_date].tail(LOOKBACK)["Adj Close"].tolist()
                 
-                for step_idx in range(max(1, idx)):
-                    if biz_dates[step_idx] > db_max_date and biz_dates[step_idx] < curr_date:
-                        scaled_val = scaler.transform([[preds_prices[step_idx]]])[0, 0]
-                        scaled_seed.append(scaled_val)
-                        
-                x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
-                out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
-                pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
-                preds_prices.append(pred_val)
+                # Fill missing pieces with our own steps
+                idx_offset = len(preds_prices) - 1
+                step_back = 1
+                while len(lookback_context) < LOOKBACK and idx_offset >= 0:
+                    lookback_context.insert(0, preds_prices[idx_offset])
+                    idx_offset -= 1
+                
+                # Extract rolling trend adjustment to inject back into seed array
+                hist_frame = df[df.index < curr_date].tail(252)["Adj Close"]
+                trend_adj = extract_iterative_statistical_trend(hist_frame, pd.DatetimeIndex([curr_date]))[0]
 
-        # Force structural transformation onto neural model values to completely break flatlining
-        preds_prices = np.array(preds_prices, dtype=np.float32)
-        for idx in range(len(preds_prices)):
-            if idx < len(trend_deltas):
-                preds_prices[idx] += float(trend_deltas[idx] * 0.65) # Stronger 65% trend reinforcement weight
-            
-            band_frac = np.clip(daily_vol * np.sqrt(idx + 1), 0, 0.45)
-            lower_bounds.append(preds_prices[idx] * (1 - band_frac))
-            upper_bounds.append(preds_prices[idx] * (1 + band_frac))
+                x_scaled = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
+                x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
+                
+                raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
+                preds_prices.append(raw_pred + (trend_adj * 0.70))
 
-    # ─── STRATEGY 2: START DATE IS AFTER TODAY ───
+    # --- SCENARIO 2: STRATEGY BEGINS IN THE FAR FUTURE (e.g., 2032) ---
     else:
-        one_year_before_today = today_marker - pd.Timedelta(days=365)
-        hist_1y = df.loc[one_year_before_today:min(today_marker, db_max_date), "Adj Close"].resample('B').ffill().dropna()
+        # Build rolling dynamic synthetic continuation dataframe up to target start point
+        working_df = df[["Adj Close"]].copy()
+        current_gap_start = db_max_date + pd.Timedelta(days=1)
         
-        gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
-        
-        # Calculate combined structural horizons for full forecast extension window
-        total_future_dates = gap_range.append(biz_dates)
-        trend_deltas = compute_statistical_trends(hist_1y, total_future_dates)
+        while current_gap_start < target_start:
+            chunk_end = min(current_gap_start + pd.Timedelta(days=60), target_start - pd.Timedelta(days=1))
+            gap_chunk_dates = pd.bdate_range(start=current_gap_start, end=chunk_end)
+            
+            if len(gap_chunk_dates) == 0:
+                break
+                
+            chunk_trends = extract_iterative_statistical_trend(working_df.tail(252)["Adj Close"], gap_chunk_dates)
+            
+            chunk_preds = []
+            for idx, g_date in enumerate(gap_chunk_dates):
+                seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
+                x_scaled = scaler.transform(np.array(seed_vals).reshape(-1, 1)).flatten()
+                x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
+                
+                raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
+                adjusted_pred = raw_pred + (chunk_trends[idx] * 0.70)
+                chunk_preds.append(adjusted_pred)
+                
+                # Commit steps to prevent input decay flatlining
+                working_df.loc[g_date, "Adj Close"] = adjusted_pred
+                
+            current_gap_start = chunk_end + pd.Timedelta(days=1)
 
-        history_slice = df.tail(LOOKBACK)
-        scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
-        
-        bridge_step = 0
-        for g_date in gap_range:
-            x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
-            out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
-            pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
-            scaled_seed.append(out_scaled)
+        # Generate target window predictions using the updated, trend-corrected baseline
+        final_trends = extract_iterative_statistical_trend(working_df.tail(252)["Adj Close"], biz_dates)
+        for idx, b_date in enumerate(biz_dates):
+            seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
+            x_scaled = scaler.transform(np.array(seed_vals).reshape(-1, 1)).flatten()
+            x_input = np.array(x_scaled, dtype=np.float32).reshape(1, LOOKBACK, 1)
             
-            if bridge_step < len(trend_deltas):
-                pred_val += float(trend_deltas[bridge_step] * 0.65)
-                
-            band_frac = np.clip(daily_vol * np.sqrt(bridge_step + 1), 0, 0.45)
-            bridge_dates.append(g_date)
-            bridge_prices.append(pred_val)
-            bridge_lo.append(pred_val * (1 - band_frac))
-            bridge_hi.append(pred_val * (1 + band_frac))
-            bridge_step += 1
-            
-        for step in range(len(biz_dates)):
-            x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
-            out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
-            pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
-            scaled_seed.append(out_scaled)
-            
-            s_idx = bridge_step
-            if s_idx < len(trend_deltas):
-                pred_val += float(trend_deltas[s_idx] * 0.65)
-                
-            band_frac = np.clip(daily_vol * np.sqrt(bridge_step + 1), 0, 0.45)
-            preds_prices.append(pred_val)
-            lower_bounds.append(pred_val * (1 - band_frac))
-            upper_bounds.append(pred_val * (1 + band_frac))
-            bridge_step += 1
-            
-    return (biz_dates, np.array(preds_prices), np.array(lower_bounds), np.array(upper_bounds),
-            pd.DatetimeIndex(bridge_dates), np.array(bridge_prices), np.array(bridge_lo), np.array(bridge_hi))
+            raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
+            adjusted_pred = raw_pred + (final_trends[idx] * 0.70)
+            preds_prices.append(adjusted_pred)
+            working_df.loc[b_date, "Adj Close"] = adjusted_pred
+
+    # Compute variance confidence rails safely
+    preds_prices = np.array(preds_prices, dtype=np.float32)
+    lower_bounds, upper_bounds = [], []
+    for idx in range(len(preds_prices)):
+        band_frac = np.clip(daily_vol * np.sqrt(idx + 1), 0, 0.45)
+        lower_bounds.append(preds_prices[idx] * (1 - band_frac))
+        upper_bounds.append(preds_prices[idx] * (1 + band_frac))
+
+    return (biz_dates, preds_prices, np.array(lower_bounds), np.array(upper_bounds),
+            pd.DatetimeIndex([]), np.array([]), np.array([]), np.array([]))
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║                    LOAD INITIALIZER                      ║
@@ -447,7 +430,7 @@ with st.sidebar:
         "Model Resource Node", value=secret_url, type="password",
         help="Pre-loaded securely via secrets file."
     )
-    load_btn = st.button("⬇ Load Model Core", use_container_width=True, type="primary")
+    load_btn = st.button("⬇ Load Model Core", width='stretch', type="primary")
 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
@@ -593,7 +576,7 @@ with tab1:
         fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line", annotation_position="bottom left")
 
         fig_t.update_layout(**base_layout(290, "Trailing Trend Baseline Metrics Context Overlay", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig_t, use_container_width=True)
+        st.plotly_chart(fig_t, width='stretch')
 
 # ════════════════════════════════════════════════════════════
 #  TAB 2 — FORECAST ENGINE
@@ -630,7 +613,7 @@ with tab2:
         fig_fc.add_trace(go.Scatter(x=f_dates, y=f_prices, name="Target Horizon Output (Hybrid Model)", line=dict(color=BLUE, width=2.2, dash="dot"), mode="lines+markers"))
         
         fig_fc.update_layout(**base_layout(440, "Dynamic Continuity Multi-Step Simulation Chart Core", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig_fc, use_container_width=True)
+        st.plotly_chart(fig_fc, width='stretch')
 
 # ════════════════════════════════════════════════════════════
 #  TAB 3 — ADVANCED VISUALIZATIONS
@@ -690,12 +673,12 @@ with tab3:
             if c in dv.columns and dv[c].notna().any():
                 fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
         fig1.update_layout(**base_layout(340, "Continuous Close Pricing & Trailing Moving Averages", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width='stretch')
     with r1b:
         v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
         fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Node"))
         fig2.update_layout(**base_layout(340, "Unified Timeline Volume Distribution Matrix"))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
 
     r2a, r2b = st.columns([3, 2])
     with r2a:
@@ -705,11 +688,11 @@ with tab3:
             fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(122,128,153,0.04)", name="Volatility Floor", line=dict(color=MUTED, width=0.8, dash="dash")))
         fig3.update_layout(**base_layout(340, "High-Frequency Structural Candlestick + Variance Channels", override_yaxis=dict(tickprefix="$")))
         fig3.update_layout(xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width='stretch')
     with r2b:
         fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(232,200,74,0.12)", line=dict(color=ACCENT, width=1.2)))
         fig4.update_layout(**base_layout(340, "Intraday Risk Dispersion (High − Low Volatility Variance)", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width='stretch')
 
     r3a, r3b = st.columns(2)
     with r3a:
@@ -721,7 +704,7 @@ with tab3:
             fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram", marker_color=h_colors), row=2, col=1)
             fig5.update_layout(paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL, height=340, margin=dict(l=0,r=0,t=30,b=0), title=dict(text="Momentum MACD Oscillator Structure (12, 26, 9)", font=dict(size=12, color=MUTED)), showlegend=False)
             fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
-            st.plotly_chart(fig5, use_container_width=True)
+            st.plotly_chart(fig5, width='stretch')
         else: empty_state("📉", "MACD sequence arrays initializing...")
     with r3b:
         if dv["RSI"].notna().any():
@@ -732,7 +715,7 @@ with tab3:
             fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
             fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
             fig6.update_layout(**base_layout(340, "Relative Strength Velocity Index RSI (14)", override_yaxis=dict(range=[0, 100])))
-            st.plotly_chart(fig6, use_container_width=True)
+            st.plotly_chart(fig6, width='stretch')
         else: empty_state("📉", "Velocity arrays initializing...")
 
     r4a, r4b = st.columns(2)
@@ -740,7 +723,7 @@ with tab3:
         yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
         fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
         fig7.update_layout(**base_layout(340, "Macro Annual Mean Close Allocation Values (Extended Horizon)", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig7, use_container_width=True)
+        st.plotly_chart(fig7, width='stretch')
     with r4b:
         months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
         fig8 = go.Figure()
@@ -748,7 +731,7 @@ with tab3:
             sub = dv[dv.index.month == m_idx]["Close"].dropna()
             if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(91,141,238,0.18)"))
         fig8.update_layout(**base_layout(340, "Seasonality Structural Distribution Matrices"), showlegend=False)
-        st.plotly_chart(fig8, use_container_width=True)
+        st.plotly_chart(fig8, width='stretch')
 
     st.markdown('<p class="section-header">Cross-Sectional Attribute Correlation Matrix Heatmap</p>', unsafe_allow_html=True)
     corr_cols = [c for c in ["Open", "High", "Low", "Close", "Volume", "Spread"] if c in dv.columns]
@@ -758,6 +741,6 @@ with tab3:
         c_mat = corr_data.corr().round(3)
         fig11 = go.Figure(go.Heatmap(z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1, text=c_mat.values, texttemplate="%{text:.2f}", showscale=True))
         fig11.update_layout(paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL, height=360, margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig11, use_container_width=True)
+        st.plotly_chart(fig11, width='stretch')
     else:
         empty_state("📊", "Attribute matrices lack sufficient spatial alignment dimensions.")

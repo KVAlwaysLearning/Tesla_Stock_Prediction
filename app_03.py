@@ -14,12 +14,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-# We will use Statsmodels SARIMAX as the sophisticated trend component
-# It runs fast and does not require complex external C-dependencies like Prophet
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-
 warnings.filterwarnings("ignore")
 
+# Global Safe Secret Declaration Engine
 secret_url = ""
 try:
     if "model_config" in st.secrets and "gdrive_model_link" in st.secrets["model_config"]:
@@ -273,6 +270,12 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     Advanced Hybrid Strategy Engine.
     Combines deep learning models with SARIMAX seasonality filters to prevent decay flatlining.
     """
+    # Defensive Runtime Import Injection to isolate failures if environment is misconfigured
+    try:
+        from statsmodels.tsa.statespace.sarimax import SARIMAX
+    except ImportError:
+        raise RuntimeError("The 'statsmodels' library is missing from your deployment runtime. Please add statsmodels to requirements.txt")
+
     today_marker = pd.Timestamp.now().normalize()
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -286,7 +289,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     
     # ─── STRATEGY 1: START DATE IS BEFORE TODAY ───
     if target_start <= today_marker:
-        # Step 1: Extract 1 Year of historical baseline data up to June 10th
         june_10_marker = pd.Timestamp("2026-06-10")
         if june_10_marker > db_max_date:
             june_10_marker = db_max_date
@@ -294,7 +296,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         one_year_ago = june_10_marker - pd.Timedelta(days=365)
         hist_1y = df.loc[one_year_ago:june_10_marker, "Adj Close"].resample('B').ffill().dropna()
         
-        # Extract seasonality markers using a fast seasonal auto-regressive block
         try:
             sarimax_core = SARIMAX(hist_1y.values, order=(1,1,1), seasonal_order=(1,0,0,5))
             sarimax_res = sarimax_core.fit(disp=False)
@@ -302,7 +303,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         except Exception:
             seasonality_deltas = np.zeros(n_days)
 
-        # Step 2: Generate base predictions from the CNN-GRU core
         for idx, curr_date in enumerate(biz_dates):
             if curr_date <= db_max_date:
                 hist_match = df.loc[:curr_date]
@@ -322,19 +322,17 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                 pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
                 preds_prices.append(pred_val)
 
-        # Step 3: Blend seasonality curves onto model arrays to prevent flatlines
         preds_prices = np.array(preds_prices, dtype=np.float32)
         for idx in range(len(preds_prices)):
             if idx < len(seasonality_deltas):
-                preds_prices[idx] += float(seasonality_deltas[idx] * 0.45) # 45% weight alignment
+                preds_prices[idx] += float(seasonality_deltas[idx] * 0.45)
             
             band_frac = np.clip(daily_vol * np.sqrt(idx + 1), 0, 0.45)
             lower_bounds.append(preds_prices[idx] * (1 - band_frac))
             upper_bounds.append(preds_prices[idx] * (1 + band_frac))
 
-    # ─── STRATEGY 2: START DATE IS AFTER TODAY (ROLLING TIMELINE EXTENSION) ───
+    # ─── STRATEGY 2: START DATE IS AFTER TODAY ───
     else:
-        # Step 1: Strictly isolate 1 year lookback before today's date
         one_year_before_today = today_marker - pd.Timedelta(days=365)
         hist_1y = df.loc[one_year_before_today:min(today_marker, db_max_date), "Adj Close"].resample('B').ffill().dropna()
         
@@ -345,7 +343,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
         except Exception:
             seasonality_deltas = np.zeros(n_days + 30)
 
-        # Bridge gaps between max db record and requested forward start point
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
         history_slice = df.tail(LOOKBACK)
         scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
@@ -367,7 +364,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
             bridge_hi.append(pred_val * (1 + band_frac))
             bridge_step += 1
             
-        # Recursive forecast tracking loop until entire user window is fulfilled
         for step in range(1, n_days + 1):
             x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
             out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)

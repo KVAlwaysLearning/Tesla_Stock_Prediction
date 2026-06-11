@@ -21,6 +21,13 @@ def clean_html(html_code: str) -> str:
         return ""
     return "\n".join(line.strip() for line in html_code.splitlines())
 
+_original_markdown = st.markdown
+def safe_markdown(body, *args, **kwargs):
+    if isinstance(body, str) and body.strip().startswith("<"):
+        body = clean_html(body)
+    return _original_markdown(body, *args, **kwargs)
+st.markdown = safe_markdown
+
 warnings.filterwarnings("ignore")
 
 secret_url = ""

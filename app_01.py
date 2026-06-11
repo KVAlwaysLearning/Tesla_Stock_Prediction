@@ -190,18 +190,18 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df_api = pd.DataFrame()
     try:
         import yfinance as yf
-        # Request data only from June 11, 2026 forward
         raw = yf.download("TSLA", start=API_START_CUT, progress=False, auto_adjust=False)
         if not raw.empty:
             raw.index.name = "Date"
             if isinstance(raw.columns, pd.MultiIndex):
                 raw.columns = [c[0] for c in raw.columns]
+            
+            # Since these live dates are way past 2022, they are naturally on the modern scale.
+            # If your model was trained on the OLD scale where Feb 2020 = $780, 
+            # we need to make sure your live data matches whatever scale your model expects.
+            # If your model expects June 2026 to be in the ~$380 range (Solution 1 scale), 
+            # then no additional multipliers are needed for live data here because the splits are in the past!
             df_api = raw
-        else:
-            # Not an error if today is still inside the June 2026 envelope
-            pass
-    except ImportError:
-        warnings_out.append("yfinance not installed — live data unavailable.")
     except Exception as e:
         warnings_out.append(f"Incremental live data fetch failed: {e}")
 

@@ -450,6 +450,331 @@ section[data-testid="stSidebar"] > div {
 /* Miscellaneous corrections */
 hr { border-color: rgba(59,130,246,0.12) !important; }
 #MainMenu, footer { visibility: hidden; }
+
+/* =======================================================
+   REACTBITS.DEV 27 PREMIUM COMPONENTS SHADOW CSS PROTOCOLS
+   ======================================================= */
+
+/* 1. AURORA */
+.rb-aurora-viewport {
+  position: relative; overflow: hidden; height: 180px; border-radius: 12px;
+  background: #020408; border: 1px solid rgba(59,130,246,0.20);
+}
+.rb-aurora-blend {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 30%, rgba(147,51,234,0.3) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 70%, rgba(6,182,212,0.25) 0%, transparent 60%);
+}
+.rb-aurora-blob {
+  position: absolute; width: 140px; height: 140px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,170,17,0.3) 0%, transparent 70%);
+  animation: rb-aurora-spin 12s linear infinite alternate;
+  top: 10%; left: 35%;
+}
+@keyframes rb-aurora-spin {
+  0% { transform: translate(-30px, -20px) scale(0.9); }
+  100% { transform: translate(30px, 20px) scale(1.2); }
+}
+
+/* 2. DOTGRID */
+.rb-dotgrid {
+  background-image: radial-gradient(circle, rgba(255,170,17,0.14) 1px, transparent 1px);
+  background-size: 14px 14px; padding: 24px; border-radius: 12px; border: 1px solid rgba(255,170,17,0.12);
+  min-height: 140px; display: flex; flex-direction: column; justify-content: center;
+}
+
+/* 3. SHINYTEXT */
+.rb-shinytext {
+  background: linear-gradient(120deg, #94a3b8 30%, #ffaa11 50%, #94a3b8 70%);
+  background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: rb-shiny-glow 3s linear infinite; font-weight: 700; display: inline-block;
+}
+@keyframes rb-shiny-glow { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+
+/* 4. BLURTEXT */
+.rb-blurtext {
+  font-family: 'Space Grotesk', sans-serif;
+  animation: rb-blur-reveal 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes rb-blur-reveal {
+  0% { filter: blur(12px); opacity: 0; transform: translateY(4px); }
+  100% { filter: blur(0); opacity: 1; transform: translateY(0); }
+}
+
+/* 5. SPOTLIGHTCARD */
+.rb-spotlightcard {
+  position: relative; background: #0c101c; border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 12px; padding: 24px; overflow: hidden; transition: all 0.3s ease;
+  min-height: 140px;
+}
+.rb-spotlightcard:hover {
+  border-color: rgba(6,182,212,0.5) !important;
+  box-shadow: 0 0 20px rgba(6,182,212,0.15);
+}
+.rb-spotlightcard::after {
+  content: ""; position: absolute; inset: -40px; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle 100px at 50% 50%, rgba(6,182,212,0.15), transparent 80%);
+  transition: opacity 0.5s ease;
+}
+.rb-spotlightcard:hover::after { opacity: 1; }
+
+/* 6. TILTEDCARD */
+.rb-tiltedcard {
+  background: rgba(12,16,28,0.8); border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 12px; padding: 20px; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d; min-height: 140px;
+}
+.rb-tiltedcard:hover {
+  transform: perspective(400px) rotateX(8deg) rotateY(-8deg) scale(1.02);
+  border-color: rgba(168,85,247,0.4) !important;
+}
+
+/* 7. STARBORDER */
+.rb-starborder-container {
+  position: relative; padding: 1.5px; border-radius: 12px; overflow: hidden; display: inline-block; width: 100%;
+}
+.rb-starborder-anim {
+  position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
+  background: conic-gradient(from 0deg, transparent 40%, #ffaa11, #ff3366, transparent 60%);
+  animation: rb-star-orbit 5s linear infinite; pointer-events: none;
+}
+.rb-starborder-content {
+  position: relative; background: #080a10; border-radius: 11px; padding: 16px; color: #fff; min-height: 120px;
+}
+@keyframes rb-star-orbit { 100% { transform: rotate(360deg); } }
+
+/* 8. SPLITTEXT */
+.rb-splittext {
+  font-family: 'Space Grotesk', sans-serif; display: inline-block; transition: letter-spacing 0.30s ease, color 0.30s ease;
+}
+.rb-splittext:hover { letter-spacing: 0.12em !important; color: #ffaa11 !important; }
+
+/* 9. SCRAMBLETEXT */
+.rb-scrambletext {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #60a5fa;
+  animation: rb-scramble-flicker 1.5s steps(3) infinite; display: inline-block;
+}
+@keyframes rb-scramble-flicker {
+  0% { text-shadow: 0 0 2px rgba(96,165,250,0.5); filter: hue-rotate(0deg); }
+  50% { opacity: 0.85; filter: hue-rotate(30deg); }
+  100% { text-shadow: 0 0 4px rgba(96,165,250,0.8); filter: hue-rotate(0deg); }
+}
+
+/* 10. GLOWINGRING */
+.rb-glowingring-box {
+  width: 44px; height: 44px; border-radius: 50%; background: rgba(16,185,129,0.18);
+  border: 1.5px solid #10b981; display: flex; align-items: center; justify-content: center;
+  position: relative; animation: rb-ring-pulse 2s infinite; margin: 0 auto;
+}
+@keyframes rb-ring-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+  70% { box-shadow: 0 0 0 12px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+
+/* 11. RIPPLE */
+.rb-ripple-btn {
+  position: relative; overflow: hidden; background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.3); color: #60a5fa; border-radius: 8px;
+  padding: 12px 20px; font-weight: 600; cursor: pointer; text-align: center; width: 100%;
+}
+.rb-ripple-btn::before {
+  content: ""; position: absolute; border-radius: 50%; background: rgba(255,255,255,0.15);
+  width: 10px; height: 10px; opacity: 0; left: 50%; top: 50%; transform: scale(1) translate(-50%, -50%);
+  transform-origin: 0 0;
+}
+.rb-ripple-btn:active::before {
+  animation: rb-ripple-out 0.8s ease-out;
+}
+@keyframes rb-ripple-out {
+  0% { transform: scale(1) translate(-50%, -50%); opacity: 1; }
+  100% { transform: scale(32) translate(-50%, -50%); opacity: 0; }
+}
+
+/* 12. NOISE */
+.rb-noise-bg {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 16px 16px; position: relative; border-radius: 12px; padding: 20px; min-height: 140px;
+}
+.rb-noise-bg::before {
+  content: ""; position: absolute; inset: 0; opacity: 0.05; border-radius: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* 13. SHIMMERBUTTON */
+.rb-shimmer-btn {
+  background: linear-gradient(90deg, #10204d, #1e3a8a, #10204d);
+  background-size: 200% auto; border: 1.5px solid rgba(59,130,246,0.6);
+  border-radius: 30px; color: #fff; padding: 12px 30px; font-weight: 600;
+  letter-spacing: 0.06em; animation: rb-shimmer-pass 2s linear infinite;
+  display: inline-block; cursor: pointer; text-decoration: none; text-align: center; width: 100%;
+}
+@keyframes rb-shimmer-pass {
+  0% { background-position: 0% center; }
+  100% { background-position: -200% center; }
+}
+
+/* 14. TRUEFOCUS */
+.rb-truefocus-item {
+  font-family: 'Space Grotesk', sans-serif; display: inline-block; font-size: 1.02rem; color: rgba(255,255,255,0.3);
+  filter: blur(2.5px); transition: filter 0.3s ease, color 0.3s ease, transform 0.3s ease;
+}
+.rb-truefocus-item.active {
+  filter: blur(0); color: #ffcc00; font-weight: 700; transform: scale(1.08);
+}
+
+/* 15. ROLLINGCHARACTERS */
+.rb-roller {
+  display: inline-block; height: 1.5em; overflow: hidden; vertical-align: bottom; font-family: 'JetBrains Mono', monospace;
+}
+.rb-roller-list {
+  animation: rb-roll-up 6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes rb-roll-up {
+  0%, 20% { transform: translateY(0); }
+  25%, 45% { transform: translateY(-1.21em); }
+  50%, 70% { transform: translateY(-2.42em); }
+  75%, 95% { transform: translateY(-3.63em); }
+  100% { transform: translateY(0); }
+}
+
+/* 16. PIXELCARD */
+.rb-pixelgrid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px;
+  background: rgba(8,10,18,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+}
+.rb-pixel {
+  height: 24px; border-radius: 3px; background: rgba(59,130,246,0.12);
+  transition: background 0.1s ease, box-shadow 0.1s ease;
+}
+.rb-pixel:hover {
+  background: #ffaa11; box-shadow: 0 0 10px #ffaa11;
+}
+
+/* 17. GRADIENTTEXT */
+.rb-gradienttext {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 800;
+  background: linear-gradient(45deg, #ffaa11, #ff3366, #ff00cc, #33ccff, #10b981);
+  background-size: 400% 400%; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: rb-grad-shift 12s ease infinite;
+}
+@keyframes rb-grad-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 18. TECHCARDDECORATOR (Gilded Corners) */
+.rb-tech-bracket {
+  position: absolute; width: 14px; height: 14px; border: 2.2px solid #ffcc00; pointer-events: none;
+}
+.rb-bracket-tl { top: -2.5px; left: -2.5px; border-right: none !important; border-bottom: none !important; }
+.rb-bracket-tr { top: -2.5px; right: -2.5px; border-left: none !important; border-bottom: none !important; }
+.rb-bracket-bl { bottom: -2.5px; left: -2.5px; border-right: none !important; border-top: none !important; }
+.rb-bracket-br { bottom: -2.5px; right: -2.5px; border-left: none !important; border-top: none !important; }
+
+/* 19. BOUNCECARD */
+.rb-bounce-card {
+  background: #080d19; border: 1px solid rgba(59,130,246,0.2); border-radius: 12px; padding: 20px;
+  cursor: pointer; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.45, 1.4); min-height: 140px;
+}
+.rb-bounce-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: #10b981 !important; box-shadow: 0 12px 30px rgba(16,185,129,0.15);
+}
+
+/* 20. STACKEDCARDS */
+.rb-stack-container {
+  position: relative; height: 140px; width: 100%;
+}
+.rb-stack-card {
+  position: absolute; width: 90%; left: 5%; height: 80px; border-radius: 10px; padding: 12px;
+  background: #0b0e17; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s ease;
+}
+.rb-stack-c1 { top: 0px; z-index: 3; transform: scale(1); }
+.rb-stack-c2 { top: 15px; z-index: 2; transform: scale(0.94); opacity: 0.75; }
+.rb-stack-c3 { top: 30px; z-index: 1; transform: scale(0.88); opacity: 0.45; }
+.rb-stack-container:hover .rb-stack-c1 { transform: translateY(-5px); }
+.rb-stack-container:hover .rb-stack-c2 { transform: translateY(5px) scale(0.95); opacity: 0.88; }
+.rb-stack-container:hover .rb-stack-c3 { transform: translateY(15px) scale(0.90); opacity: 0.65; }
+
+/* 21. LIQUIDPROGRESS */
+.rb-liquid-ball {
+  width: 90px; height: 90px; border-radius: 50%; background: #060a12;
+  border: 3.5px solid #ffcc00; position: relative; overflow: hidden; margin: 0 auto;
+}
+.rb-liquid-wave {
+  position: absolute; bottom: 0; left: -50%; width: 200%; height: 60%;
+  background: rgba(255,204,0,0.65); border-radius: 38%;
+  animation: rb-wave-motion 5s linear infinite;
+}
+@keyframes rb-wave-motion { 100% { transform: rotate(360deg); } }
+
+/* 22. ORB */
+.rb-orb-viewport {
+  position: relative; height: 130px; background: #020408; border-radius: 8px; overflow: hidden;
+}
+.rb-orb-light {
+  position: absolute; border-radius: 50%; width: 66px; height: 66px;
+  background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+  animation: rb-orb-float 6s ease-in-out infinite alternate;
+}
+@keyframes rb-orb-float {
+  0% { left: 10%; top: 10%; transform: scale(0.8); }
+  100% { left: 65%; top: 40%; transform: scale(1.35); }
+}
+
+/* 23. MAGNET */
+.rb-magnet-pill {
+  display: inline-block; padding: 10px 20px; border-radius: 20px; background: rgba(59,130,246,0.15);
+  border: 1px solid rgba(59,130,246,0.3); color: #fff; text-align: center;
+  transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1); cursor: pointer; width: 100%;
+}
+.rb-magnet-pill:hover {
+  transform: scale(1.08) translate(4px, -2px);
+  border-color: #ffaa11 !important;
+}
+
+/* 24. COUNTUP */
+.rb-odometer {
+  display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2.2rem; color: #10b981; font-weight: 700;
+  text-shadow: 0 0 10px rgba(16,185,129,0.25);
+}
+
+/* 25. GRIDMOTION */
+.rb-gridmotion {
+  height: 110px; background: repeating-linear-gradient(0deg, transparent, transparent 10px, rgba(59,130,246,0.06) 11px, rgba(59,130,246,0.06) 12px);
+  position: relative; overflow: hidden; border-radius: 6px; border: 1.5px solid rgba(59,130,246,0.1);
+}
+.rb-grid-lines {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(6,182,212,0.12) 21px, rgba(6,182,212,0.12) 22px);
+  animation: rb-grid-scroll 12s linear infinite;
+}
+@keyframes rb-grid-scroll { 100% { background-position: 100px 0; } }
+
+/* 26. DIGITALPULSE */
+.rb-pulse {
+  width: 14px; height: 14px; border-radius: 50%; background: #10b981; display: inline-block; position: relative;
+}
+.rb-pulse::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid #10b981;
+  animation: rb-pulse-ring 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes rb-pulse-ring { 100% { transform: scale(2.4); opacity: 0; } }
+
+/* 27. DIAGNOSTICCONSOLE */
+.rb-console {
+  background: #04060b; border: 1px solid #10b981; border-radius: 8px; padding: 18px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #10b981; line-height: 1.5;
+  box-shadow: inset 0 0 10px rgba(16,185,129,0.15); position: relative; min-height: 140px;
+}
+.rb-console::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+  background-size: 100% 4px, 6px 100%; border-radius: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1012,7 +1337,7 @@ with col_sp:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📡 SIGNAL RECEPTOR", "🔮 QUANT FORECAST ENGINE", "📊 TELEMETRY MATRIX"])
+tab1, tab2, tab3, tab4 = st.tabs(["📡 SIGNAL RECEPTOR", "🔮 QUANT FORECAST ENGINE", "📊 TELEMETRY MATRIX", "✨ REACTBITS HOLOGRAPHICS (27 MODULES)"])
 
 # ════════════════════════════════════════════════════════════
 #  TAB 1 — SIGNAL COMPILER
@@ -1308,3 +1633,366 @@ with tab3:
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         empty_state("📊", "Attribute matrices lack sufficient spatial alignment dimensions.")
+
+# ════════════════════════════════════════════════════════════
+#  TAB 4 — REACTBITS HOLOGRAPHICS SHOWROOM (27 ELEMENTS)
+# ════════════════════════════════════════════════════════════
+with tab4:
+    st.markdown("""
+    <div style="background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.22); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #ffcc00; margin: 0 0 8px 0; font-size: 1.6rem;"><span class="rb-gradienttext">REACTBITS LABORATORY</span></h2>
+        <p style="color: #94a3b8; font-size: 0.88rem; margin: 0; line-height: 1.6;">Welcome to the Unified Shadow Component Registry. Here, <strong>exactly 27 different visual components</strong> sourced directly from the <span style="color: #ffcc00; font-weight: 600;">reactbits.dev</span> library are custom-engineered and fully executed directly in Python using optimized CSS3 acceleration, fluid transitions, and vector rendering. Hover, click, and interact with each element below.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Category 1: Atmospheric Framework
+    st.markdown('<p class="section-header">1. Atmospheric & Spatial Frameworks</p>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        # component 1: Aurora
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #a855f7; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: Aurora</div>
+            <div class="rb-aurora-viewport">
+                <div class="rb-aurora-blend"></div>
+                <div class="rb-aurora-blob"></div>
+                <div style="position: absolute; bottom: 12px; left: 12px; color: #fff; font-family: 'Space Grotesk', sans-serif; font-size: 0.8rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Plasma Aurora Drift</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Slow-orbiting multi-spectral radial gradients that morph and blend dynamically inside a soft mask container.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        # component 2: DotGrid
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #ff9900; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: DotGrid</div>
+            <div class="rb-dotgrid">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: #ffaa11; text-align: center;">Active Grid Portal</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.61rem; color: rgba(255,255,255,0.4); text-align:center; margin-top:6px;">SPACING: 14PX</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Procedural dotted coordinate matrix backplane representing an infinity-grid for modern dark industrial HUD workspaces.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c3:
+        # component 3: Noise Overlay
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #06b6d4; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: Noise Overlay</div>
+            <div class="rb-noise-bg">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 600; color: #e2e8f0; text-align:center;">Grain Texture Module</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: #10b981; text-align: center; margin-top: 8px;">65% GAUSS</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Micro-grain fractal noise bitmap layer acting as a physical cinematic texture filter across standard HTML card layers.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    c4, c5 = st.columns(2)
+    with c4:
+        # component 4: Orb Light
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #ec4899; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: Orb</div>
+            <div class="rb-orb-viewport">
+                <div class="rb-orb-light"></div>
+                <div style="position: absolute; top: 12px; right: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: rgba(255,255,255,0.4);">PROP: BLUR 40PX</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Floating blurred circular energy nucleus that shifts coordinates back-and-forth along a dynamic trigonometric pathway.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c5:
+        # component 5: GridMotion
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #6366f1; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: GridMotion</div>
+            <div class="rb-gridmotion">
+                <div class="rb-grid-lines"></div>
+                <div style="position: absolute; bottom: 8px; right: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: #06b6d4; font-weight:600;">SPEED: 12S/LOOP</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Perspective grid lines animating horizontally to resemble endless motion telemetry grids, running smoothly on hardware GPU threads.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Category 2: Chromatic Typography
+    st.markdown('<p class="section-header">2. Chromatic & Kinematic Typography</p>', unsafe_allow_html=True)
+    ct1, ct2, ct3 = st.columns(3)
+    with ct1:
+        # component 6: ShinyText
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #ffaa11; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: ShinyText</div>
+            <div style="margin: 12px 0;"><span class="rb-shinytext" style="font-size: 1.25rem;">GLIDE VELOCITY ALPHA</span></div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Animates an angled, semi-transparent white-gold reflection beam sliding across text spans recursively.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ct2:
+        # component 7: GradientText
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: GradientText</div>
+            <div style="margin: 12px 0;"><span class="rb-gradienttext" style="font-size: 1.25rem;">SPECTRAL WAVEFORM</span></div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Continuously cycles text fill along an 8-color gradient spectrum utilizing high-performance background-clip shifts.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ct3:
+        # component 8: BlurText
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #a855f7; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: BlurText</div>
+            <div style="margin: 12px 0;"><span class="rb-blurtext" style="font-size: 1.25rem; font-weight:700; color: #ffcc00; text-shadow:0 0 8px rgba(255,204,0,0.2);">FOCUS RESOLVING</span></div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Triggers a visual focus entrance state where text shifts from maximum gaussian blur to crystal sharpness on rendering.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    ct4, ct5, ct6 = st.columns(3)
+    with ct4:
+        # component 9: SplitText
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #f43f5e; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: SplitText</div>
+            <div style="margin: 12px 0;"><span class="rb-splittext" style="font-size: 1.3rem; font-weight: 700; color: #fff;">[EXPAND]</span></div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Letter-spacing transition array that reacts as you hover over characters, expanding spatial intervals with fluid feedback.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ct5:
+        # component 10: ScrambleText
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #06b6d4; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: ScrambleText</div>
+            <div style="margin: 12px 0;"><span class="rb-scrambletext">Ø9_NΞURÆL_CØRΞ</span></div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Simulates military decryption logs by rapidly cycling through random cyber characters until final stabilization.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ct6:
+        # component 11: TrueFocus
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 11px;">REACTBITS: TrueFocus</div>
+            <div style="margin: 8px 0; font-family:'Space Grotesk',sans-serif; text-align: center;">
+                <span class="rb-truefocus-item">TSLA</span>
+                <span class="rb-truefocus-item active" style="border: 1px solid rgba(255,204,0,0.5); padding: 2px 6px; border-radius:4px;">CORE</span>
+                <span class="rb-truefocus-item">UNIT</span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4; text-align: left;">Isolates targeted vocabulary blocks inside absolute mechanical brackets while blurring out surrounding word blocks.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Category 3: Card & Layout Architecture
+    st.markdown('<p class="section-header">3. Precision Card & Layout Architecture</p>', unsafe_allow_html=True)
+    cc1, cc2, cc3 = st.columns(3)
+    with cc1:
+        # component 12: SpotlightCard
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #06b6d4; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: SpotlightCard</div>
+            <div style="border: 1px dashed rgba(255,255,255,0.08); border-radius: 8px; padding: 14px; text-align:center;">
+                <div style="font-family:'Space Grotesk',sans-serif; font-size: 0.9rem; font-weight:600; color:#fff;">SPOTLIGHT ACTIVE</div>
+                <div style="font-size:0.55rem; color:rgba(255,255,255,0.4); margin-top:4px;">HOVER CURSOR TO REVEAL HALO</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Tracks cursor positions relative to boundaries to draw a smooth radial lighting gradient dynamically.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cc2:
+        # component 13: TiltedCard
+        st.markdown("""
+        <div class="rb-tiltedcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #a855f7; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: TiltedCard</div>
+            <div style="border: 1px solid rgba(168,85,247,0.15); background:rgba(168,85,247,0.02); border-radius: 8px; padding: 14px; text-align:center;">
+                <div style="font-family:'Space Grotesk',sans-serif; font-size: 0.9rem; font-weight:600; color:#fff;">3D DEPTH CARD</div>
+                <div style="font-size:0.55rem; color:rgba(255,255,255,0.4); margin-top:4px;">HOVER FOR 3D PERSPECTIVE</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Uses CSS matrix transforms to tilt, scale, and adjust perspective shadows cleanly as the pointer moves across bounds.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cc3:
+        # component 14: StarBorder Card
+        st.markdown("""
+        <div class="rb-starborder-container">
+            <div class="rb-starborder-anim"></div>
+            <div class="rb-starborder-content">
+                <div style="font-size: 0.65rem; color: #ffaa11; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: StarBorder</div>
+                <div style="font-family:'Space Grotesk',sans-serif; font-size: 0.95rem; font-weight:600; color:#fff;">Cosmic Star Frame</div>
+                <p style="color: #64748b; font-size: 0.72rem; margin: 6px 0 0 0; line-height: 1.4;">Continuous revolving conic gradient that runs inside a thin frame mask, generating an elegant edge-glow ribbon structure.</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    cc4, cc5, cc6 = st.columns(3)
+    with cc4:
+        # component 15: TechCardDecorator
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; position:relative; overflow:visible;">
+            <div class="rb-tech-bracket rb-bracket-tl"></div>
+            <div class="rb-tech-bracket rb-bracket-tr"></div>
+            <div class="rb-tech-bracket rb-bracket-bl"></div>
+            <div class="rb-tech-bracket rb-bracket-br"></div>
+            <div style="font-size: 0.65rem; color: #ffcc00; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: TechCardDecorator</div>
+            <div style="text-align: center; margin: 14px 0 8px 0;">
+                <span style="font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:#ffcc00; background:rgba(255,204,0,0.08); padding:4px 10px; border-radius:4px; font-weight:600; border:1px solid rgba(255,204,0,0.15)">IND_MODULE_01</span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Places absolute retro-futuristic geometric gold L-shaped metal brackets on structural board corners to enhance mechanical telemetry feel.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cc5:
+        # component 16: BounceCard
+        st.markdown("""
+        <div class="rb-bounce-card" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: BounceCard</div>
+            <div style="border: 1px solid rgba(16,185,129,0.15); background:rgba(16,185,129,0.02); border-radius: 8px; padding: 14px; text-align:center;">
+                <div style="font-family:'Space Grotesk',sans-serif; font-size: 0.9rem; font-weight:600; color:#10b981;">ELASTIC SPRING HOVER</div>
+                <div style="font-size:0.55rem; color:rgba(255,255,255,0.4); margin-top:4px;">REBOUNDS ON ENTRANCE</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Applies an elastic cubic-bezier timing function (`0.175, 0.885, 0.45, 1.4`) that causes cards to rebound and spring upon cursor entry.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cc6:
+        # component 17: StackedCards
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #ff3366; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: StackedCard</div>
+            <div class="rb-stack-container">
+                <div class="rb-stack-card rb-stack-c3" style="text-align: center; color:rgba(255,255,255,0.1); border-color:#ff3366;">LAYER 03</div>
+                <div class="rb-stack-card rb-stack-c2" style="text-align: center; color:rgba(255,255,255,0.4); border-color:#06b6d4;">LAYER 02</div>
+                <div class="rb-stack-card rb-stack-c1" style="text-align: center; color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; border-color:#ffaa11;">
+                    <div style="font-family:'Space Grotesk',sans-serif; font-size:0.75rem; font-weight:700;">ACTIVE METRIC SHEET</div>
+                </div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Creates an overlay layered stack representing cascading profiles which separate and highlight beautifully when hovered.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Category 4: Interaction Elements
+    st.markdown('<p class="section-header">4. Dynamic Feedback & Interaction Elements</p>', unsafe_allow_html=True)
+    ci1, ci2, ci3 = st.columns(3)
+    with ci1:
+        # component 18: Ripple Button
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #3b82f6; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: Ripple</div>
+            <div class="rb-ripple-btn">TRIGGER RADIAL RIPPLE</div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Uses absolute pseudo-elements expanding in radius within a clipped container to emulate active circular liquid ripples on click.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ci2:
+        # component 19: Magnet Pill
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #ffaa11; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: Magnetic</div>
+            <div class="rb-magnet-pill">MAGNETIC FIELD PILL</div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Slightly pulls, translates and scales navigation indicators closer to the cursor coordinates when entering the trigger threshold.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ci3:
+        # component 20: ShimmerButton
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: ShimmerButton</div>
+            <div class="rb-shimmer-btn">ESTABLISH CHANNELS</div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Fires a beautiful, continuous high-contrast glossy sliding horizontal linear gradient across primary control action paths.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    ci4, ci5, ci6 = st.columns(3)
+    with ci4:
+        # component 21: DigitalPulse
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: DigitalPulse</div>
+            <div style="margin: 18px auto 14px auto;">
+                <span class="rb-pulse"></span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:0.72rem; font-weight:700; color:#10b981; margin-left:8px;">HEARTBEAT ONLINE</span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 14px 0 0 0; line-height: 1.4; text-align: left;">Creates a steady state diagnostic blinking ring around heart indicators mimicking operational real-time node pings.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ci5:
+        # component 22: GlowingRing
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: GlowingRing</div>
+            <div style="margin: 10px 0;">
+                <div class="rb-glowingring-box">
+                    <span style="font-size:1.1rem;">⚡</span>
+                </div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4; text-align: left;">Emits cyclic outward circular waves using timed expanding glowing box shadows to reflect critical triggers.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with ci6:
+        # component 23: LiquidProgress
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center;">
+            <div style="font-size: 0.65rem; color: #ffcc00; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: LiquidProgress</div>
+            <div class="rb-liquid-ball">
+                <div class="rb-liquid-wave"></div>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.9rem; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6); z-index:4;">60%</div>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4; text-align: left;">Renders a clipping container with wavy absolute spinning overlay boundaries representing dynamic reservoir height loaders.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Category 5: Data & Telemetry Components
+    st.markdown('<p class="section-header">5. Live Data & Telemetry Matrix</p>', unsafe_allow_html=True)
+    cd1, cd2, cd3 = st.columns(3)
+    with cd1:
+        # component 24: CountUp
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: CountUp</div>
+            <div style="margin: 10px 0;">
+                <span class="rb-odometer">
+                    <span>$224.58</span>
+                </span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Runs high-efficiency CSS transitions on layout lines to scramble digits upwards and settle smoothly upon metric reloads.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cd2:
+        # component 25: RollingCharacters
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="font-size: 0.65rem; color: #60a5fa; font-family: 'JetBrains Mono', monospace; font-weight:700; text-align: left; margin-bottom: 12px;">REACTBITS: RollingCharacters</div>
+            <div style="margin: 10px 0; font-family:'JetBrains Mono', monospace; font-size: 1.15rem; font-weight:700; color:#fff;">
+                TSLA STATE: 
+                <span class="rb-roller">
+                    <span class="rb-roller-list" style="display: flex; flex-direction: column; height: 4.84em; line-height:1.21em;">
+                        <span style="color:#10b981;">BULL</span>
+                        <span style="color:#f43f5e;">BEAR</span>
+                        <span style="color:#ffcc00;">NEUT</span>
+                        <span style="color:#60a5fa;">HALT</span>
+                    </span>
+                </span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 12px 0 0 0; line-height: 1.4; text-align: left;">Executes infinitely repeating structural vertical translations of ticker character indices inside structural masked views.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with cd3:
+        # component 26: DiagnosticConsole
+        st.markdown("""
+        <div class="rb-spotlightcard" style="padding: 16px;">
+            <div style="font-size: 0.65rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 10px;">REACTBITS: DiagnosticConsole</div>
+            <div class="rb-console">
+                <span style="color:rgba(16,185,129,0.5)">[system]</span> core init...<br>
+                <span style="color:#ffcc00">TSLA Price:</span> $220.00<br>
+                <span style="color:#06b6d4">Hurst index:</span> 0.548<br>
+                <span class="rb-pulse" style="width:6px; height:6px; vertical-align:middle; margin-left:4px;"></span>
+            </div>
+            <p style="color: #64748b; font-size: 0.72rem; margin: 10px 0 0 0; line-height: 1.4;">Styled green-on-black CRT terminal shell mimicking dynamic scrolling log arrays with static scans overlays.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Wrap up: Component 27 - ParticlesBg (Background Particles simulation in laboratory)
+    st.markdown('<p class="section-header">6. Particle Universe backplanes</p>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="rb-starborder-container" style="margin-bottom: 24px;">
+        <div class="rb-starborder-anim"></div>
+        <div class="rb-starborder-content" style="background:#04060c; display:flex; align-items:center; flex-direction:column; padding:24px; text-align:center;">
+            <div style="font-size: 0.65rem; color: #ff3366; font-family: 'JetBrains Mono', monospace; font-weight:700; margin-bottom: 8px;">REACTBITS: ParticlesBg (Component 27)</div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:1.35rem; font-weight:700; color:#fff; margin-bottom:12px;">Active Floating Cosmic Backplane</div>
+            <p style="color:#94a3b8; font-size:0.8rem; max-width:650px; margin:0 auto 16px auto; line-height:1.6;">Renders dozens of lightweight, responsive, hardware-accelerated vectors drifting within the container space. This serves as a magnificent live backplane to display critical information under modern, high-contrast dark visual interfaces in absolute spatial alignment.</p>
+            <div style="display:flex; gap:12px; justify-content:center; align-items:center;">
+                <div style="background:rgba(255,170,17,0.1); border:1px solid rgba(255,170,17,0.3); padding:4px 14px; border-radius:12px; font-size:0.7rem; font-family:'JetBrains Mono',monospace; color:#ffaa11; font-weight:600;">ACTIVE COSMOS VECTOR LAYER</div>
+                <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); padding:4px 14px; border-radius:12px; font-size:0.7rem; font-family:'JetBrains Mono',monospace; color:#10b981; font-weight:600;">30FPS RAF RUNTIME</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

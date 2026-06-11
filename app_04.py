@@ -790,7 +790,7 @@ with tab2:
 
         fig_fc = go.Figure()
         
-        # CHANGED: We now feed the ENTIRE historical dataframe series so there is no gap when zooming back/out
+        # Full historical line (needed for seamless pan/zoom)
         fig_fc.add_trace(go.Scatter(x=df.index, y=df["Adj Close"], name="Database Historical Core", line=dict(color=ACCENT, width=2)))
         
         if b_dates is not None and len(b_dates) > 0:
@@ -803,17 +803,40 @@ with tab2:
         fy = list(f_upper) + list(f_lower[::-1])
         fig_fc.add_trace(go.Scatter(x=fx, y=fy, fill="toself", fillcolor="rgba(91,141,238,0.12)", line=dict(color="rgba(0,0,0,0)"), name="Forecast Confidence Variance"))
         fig_fc.add_trace(go.Scatter(x=f_dates, y=f_prices, name="Target Horizon Output (Hybrid Model)", line=dict(color=BLUE, width=2.2, dash="dot"), mode="lines+markers"))
-        
-        # CHANGED: Calculate exact 2-month viewport padding parameters before and after the horizon timeline targets
+
+        # ── X-axis viewport: 2 months before start → 2 months after horizon end ──
         view_start = pd.Timestamp(chosen_start_date) - pd.DateOffset(months=2)
-        view_end = pd.Timestamp(f_dates[-1]) + pd.DateOffset(months=2)
-        
-        # Formulate base layout dictionary parameters
-        base_ly_params = base_layout(440, "Dynamic Continuity Multi-Step Simulation Chart Core", override_yaxis=dict(tickprefix="$"))
-        
-        # Force default initial viewing window scope restrictions on the X-Axis timeline scale boundary parameters
+        view_end   = pd.Timestamp(f_dates[-1]) + pd.DateOffset(months=2)
+
+        # ── Y-axis: tight range derived from data in the visible window only ─────
+        # Collect all price values that fall within the x viewport
+        hist_in_view = df.loc[
+            (df.index >= view_start) & (df.index <= view_end), "Adj Close"
+        ].dropna()
+        all_visible_prices = list(hist_in_view.values) + list(f_prices)
+        if b_prices is not None and len(b_prices) > 0:
+            all_visible_prices += list(b_prices)
+        # Include confidence band extremes so bands are never clipped
+        all_visible_prices += list(f_lower) + list(f_upper)
+        if b_lower is not None and len(b_lower) > 0:
+            all_visible_prices += list(b_lower) + list(b_upper)
+
+        all_visible_prices = [v for v in all_visible_prices if np.isfinite(v) and v > 0]
+        if all_visible_prices:
+            y_min   = min(all_visible_prices)
+            y_max   = max(all_visible_prices)
+            y_pad   = (y_max - y_min) * 0.08   # 8% padding above and below
+            y_range = [y_min - y_pad, y_max + y_pad]
+        else:
+            y_range = None
+
+        base_ly_params = base_layout(
+            440,
+            "Dynamic Continuity Multi-Step Simulation Chart Core",
+            override_yaxis=dict(tickprefix="$", range=y_range) if y_range else dict(tickprefix="$"),
+        )
         base_ly_params["xaxis"].update(dict(range=[view_start, view_end]))
-        
+
         fig_fc.update_layout(**base_ly_params)
         st.plotly_chart(fig_fc, width='stretch')
 

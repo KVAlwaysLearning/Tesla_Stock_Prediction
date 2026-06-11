@@ -300,8 +300,8 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     """
-    Robust Past-Date Aware Iterative Additive Engine.
-    Imputes historical markers safely without triggering slicing index faults.
+    Production-Grade Additive Structural Matrix. 
+    Uses positional iloc lookups via binary search get_indexer to avoid weekend/holiday layout KeyError faults.
     """
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
@@ -313,27 +313,31 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     preds_prices = []
     bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
     
-    # ─── SCENARIO 1: STARTING DATE LANDS INSIDE / BEFORE ACTUAL DATA MARKERS ───
+    # ─── SCENARIO 1: TARGET BOUNDARY LIES INSIDE HISTORICAL RECORD MARKERS ───
     if target_start <= db_max_date:
         for curr_date in biz_dates:
             if curr_date <= db_max_date:
-                # Direct Ground Truth Imputation Override
-                preds_prices.append(float(df.loc[curr_date, "Adj Close"]))
+                # Absolute Ground Truth Override using nearest matching positional anchor
+                pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
+                if pos_idx == -1: 
+                    pos_idx = 0
+                preds_prices.append(float(df.iloc[pos_idx]["Adj Close"]))
             else:
-                # Past-date aware lookback query strategy
-                history_up_to = df[df.index < curr_date]
-                if len(history_up_to) < LOOKBACK:
-                    # Fallback context window anchor if data index bounds are exceeded
-                    history_up_to = df.head(LOOKBACK)
-                    
-                lookback_context = history_up_to.tail(LOOKBACK)["Adj Close"].tolist()
+                # Dynamic Rolling Loop Context Window Mapping
+                pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
+                if pos_idx != -1 and pos_idx >= LOOKBACK:
+                    history_slice = df.iloc[:pos_idx]
+                else:
+                    history_slice = df.head(LOOKBACK)
+
+                lookback_context = history_slice.tail(LOOKBACK)["Adj Close"].tolist()
                 
                 idx_offset = len(preds_prices) - 1
                 while len(lookback_context) < LOOKBACK and idx_offset >= 0:
                     lookback_context.insert(0, preds_prices[idx_offset])
                     idx_offset -= 1
                 
-                hist_frame = history_up_to.tail(252)["Adj Close"]
+                hist_frame = history_slice.tail(252)["Adj Close"]
                 additive_structural_delta = extract_additive_components(hist_frame, pd.DatetimeIndex([curr_date]))[0]
 
                 x_scaled = scaler.transform(np.array(lookback_context[-LOOKBACK:]).reshape(-1, 1)).flatten()
@@ -342,7 +346,7 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                 raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
                 preds_prices.append(raw_pred + (additive_structural_delta * 0.75))
 
-    # ─── SCENARIO 2: STARTING DATE LANDS IN FAR FUTURE (Gap Bridge Layer Active) ───
+    # ─── SCENARIO 2: TARGET BOUNDARY LIES OUTSIDE HISTORICAL BOUNDS (Bridge Layer Enabled) ───
     else:
         working_df = df[["Adj Close"]].copy()
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))

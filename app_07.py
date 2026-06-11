@@ -806,23 +806,43 @@ def safe_float(val, fallback=0.0) -> float:
         return fallback
 
 def empty_state(icon: str, msg: str):
-    st.markdown(
-        f'<div style="background: rgba(12,16,28,0.52); border: 1px dashed rgba(59,130,246,0.20); '
-        f'border-radius: 12px; padding: 48px; text-align: center; color: #64748b; backdrop-filter: blur(8px);">'
-        f'<div style="font-size: 2.5rem; margin-bottom: 12px;">{icon}</div>'
-        f'<div style="font-size: 0.90rem; max-width: 420px; margin: 0 auto; line-height: 1.6;">{msg}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"""
+    <div class="rb-starborder-container" style="margin-top: 10px; width: 100%;">
+        <div class="rb-starborder-anim"></div>
+        <div class="rb-starborder-content" style="background:#0a0d16; display:flex; align-items:center; flex-direction:column; padding:36px; text-align:center; min-height: 180px; position: relative; overflow: hidden;">
+            <!-- ParticlesBg (Component 27) / DotGrid (Component 2) coordinate drifting backplane simulated visually -->
+            <div style="position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 20px 20px; opacity: 0.55; pointer-events: none;" class="rb-dotgrid"></div>
+            
+            <div style="font-size: 2.8rem; margin-bottom: 12px; z-index: 2;">{icon}</div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.90rem; max-width: 480px; margin: 0 auto; line-height: 1.6; color: #a1b0cb; font-weight: 500; z-index: 2;">{msg}</div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.58rem; color: #64748b; margin-top: 14px; letter-spacing: 0.05em; z-index: 2;">COSMOS PARTICLES VECTOR BACKPLANE STABILIZED</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metric-muted") -> str:
-    return (
-        f'<div class="metric-card">'
-        f'<div class="metric-label">{label}</div>'
-        f'<div class="metric-value">{value}</div>'
-        f'<div class="{delta_cls}">{delta}</div>'
-        f'</div>'
-    )
+def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metric-muted", show_scramble=False) -> str:
+    # Golden corners TechCardDecorator (Component 15 / 18)
+    decorator = """
+    <div class="rb-tech-bracket rb-bracket-tl" style="border-color: rgba(255,204,0,0.3);"></div>
+    <div class="rb-tech-bracket rb-bracket-tr" style="border-color: rgba(255,204,0,0.3);"></div>
+    <div class="rb-tech-bracket rb-bracket-bl" style="border-color: rgba(255,204,0,0.3);"></div>
+    <div class="rb-tech-bracket rb-bracket-br" style="border-color: rgba(255,204,0,0.3);"></div>
+    """
+    
+    # Check if we show a gold shine or sliding text glow
+    val_inner = f'<span class="rb-shinytext">{value}</span>' if show_scramble else f'<span class="rb-blurtext" style="color: #ffffff;">{value}</span>'
+    
+    # SpotlightCard (Component 12) + BounceCard (Component 16) + Noise Overlay (Component 3) + TechCardDecorator (Component 15) + BlurText (Component 8):
+    return f"""
+    <div class="metric-card rb-spotlightcard rb-bounce-card" style="position: relative; overflow: visible; padding: 18px 16px !important; min-height: 110px; background: #0c101c !important;">
+        {decorator}
+        <div class="rb-noise-bg" style="padding: 0; min-height: 0;">
+            <div class="metric-label" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.70rem; color: #94a3b8; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px;">{label}</div>
+            <div class="metric-value" style="font-size: 1.45rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 2px 0;">{val_inner}</div>
+            <div class="{delta_cls}" style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 500;">{delta}</div>
+        </div>
+    </div>
+    """
 
 def base_layout(height: int = 350, title: str = "", override_yaxis=None) -> dict:
     layout = dict(
@@ -1228,29 +1248,52 @@ except Exception as _scaler_err:
 
 # Critical configuration sidebar with optimized scrolling styling and interactive nodes
 with st.sidebar:
-    st.markdown("## <span class='shiny-text'>⚡ TSLA TRANSCEIVER</span>", unsafe_allow_html=True)
+    # ShinyText on header
+    st.markdown("## <span class='rb-shinytext' style='font-family: \"Space Grotesk\", sans-serif; font-size:1.6rem; font-weight:700;'>⚡ TSLA TRANSCEIVER</span>", unsafe_allow_html=True)
     st.markdown("---")
 
-    st.markdown('<p class="section-header">Model Engine Control</p>', unsafe_allow_html=True)
+    # GradientText + Noise (Component 7 / 3) + 3D TiltedCard (Component 13)
+    st.markdown('<p class="section-header"><span class="rb-gradienttext">Model Engine Control</span></p>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="rb-tiltedcard rb-noise-bg" style="padding: 12px; border: 1.5px solid rgba(59,130,246,0.18); background: rgba(59,130,246,0.02); border-radius: 8px; margin-bottom: 12px; overflow: visible; position: relative;">
+        <div style="font-size: 0.62rem; color: #60a5fa; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-bottom: 6px;">TILT SECURE MODEL LINK</div>
+    """, unsafe_allow_html=True)
+    
     gdrive_url = st.text_input(
         "Network Cloud Model Link", value=secret_url, type="password",
         help="Model artifact download link"
     )
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
     load_btn = st.button("⬇ INITIALIZE CORE ENGINE", type="primary")
 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
-        model_status_slot.success("🟢 CORE PROTOCOLS ONLINE")
+        model_status_slot.markdown("""
+        <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+            <span class="rb-pulse"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">🟢 CORE PROTOCOLS ONLINE</span>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        model_status_slot.info("⏳ Core offline. Connect transceivers.")
+        model_status_slot.markdown("""
+        <div class="rb-bounce-card" style="background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+            <span class="rb-pulse" style="background:#f43f5e; box-shadow: 0 0 8px #f43f5e;"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #f43f5e; font-weight: 700;">⏳ Transceiver Link Pending</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown('<p class="section-header">Forecast Space parameters</p>', unsafe_allow_html=True)
+    # Magnet Pill (Component 19)
+    st.markdown('<p class="section-header"><span class="rb-gradienttext">Forecast Space Parameters</span></p>', unsafe_allow_html=True)
+    st.markdown('<div class="rb-magnet-pill" style="padding: 2px 8px; font-size:0.65rem; color:#60a5fa; font-weight:600; display:inline-block; border-radius:20px; border:1px solid rgba(59,130,246,0.15)">GRAVITY ANCHOR POINT</div>', unsafe_allow_html=True)
     chosen_start_date = st.date_input("Anchor Execution Date", value=df.index[-1].date())
     forecast_days     = st.slider("Forecast Temporal Reach", 5, 60, 30, 5)
 
     st.markdown("---")
-    st.markdown('<p class="section-header">Alpha Risk matrix</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header"><span class="rb-gradienttext">Alpha Risk Matrix</span></p>', unsafe_allow_html=True)
     entry_price  = st.number_input("Target Entry Level ($)", min_value=0.0, value=0.0, step=0.01)
     position_qty = st.number_input("Unit Target Density", min_value=1, value=10, step=1)
     risk_pct     = st.slider("Risk Tolerance Clip (%)", 1, 20, 5)
@@ -1263,7 +1306,12 @@ if not st.session_state.get("model_loaded", False):
             try:
                 st.session_state["model_obj"] = load_model_cached(f_id)
                 st.session_state["model_loaded"] = True
-                model_status_slot.success("🟢 CORE PROTOCOLS ONLINE")
+                model_status_slot.markdown("""
+                <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                    <span class="rb-pulse"></span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">🟢 CORE PROTOCOLS ONLINE</span>
+                </div>
+                """, unsafe_allow_html=True)
             except Exception:
                 st.session_state["model_loaded"] = False
 
@@ -1277,9 +1325,19 @@ if load_btn:
                     try:
                         st.session_state["model_obj"] = load_model_cached(f_id)
                         st.session_state["model_loaded"] = True
-                        model_status_slot.success("✅ DEPLOYMENT STABILIZED")
+                        model_status_slot.markdown("""
+                        <div class="rb-bounce-card" style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                            <span class="rb-pulse"></span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">✅ DEPLOYMENT STABILIZED</span>
+                        </div>
+                        """, unsafe_allow_html=True)
                     except Exception as _me:
-                        st.error(f"❌ {_me}")
+                        model_status_slot.markdown(f"""
+                        <div class="rb-bounce-card" style="background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.4); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                            <span class="rb-pulse" style="background:#f43f5e;"></span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #f43f5e; font-weight: 700;">❌ {_me}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
 
 model = st.session_state.get("model_obj", None)
 eff_entry = entry_price if entry_price > 0.0 else current_price
@@ -1301,15 +1359,26 @@ if model is not None and scaler_ok:
 # ╚══════════════════════════════════════════════════════════╝
 
 st.markdown("""
-<div class="app-header-banner">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+<div class="app-header-banner rb-spotlightcard rb-noise-bg" style="position: relative; overflow: hidden; padding: 28px 32px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.22); background: #0c101c;">
+    <!-- GridMotion Background Grid (Component 5) -->
+    <div class="rb-gridmotion" style="position: absolute; inset: 0; height: 100%; border: none; opacity: 0.16; pointer-events: none; z-index: 1;">
+        <div class="rb-grid-lines"></div>
+    </div>
+    
+    <div style="position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 16px;">
         <div>
-            <h1 class="app-title"><span class="shiny-text">TSLA HYBRID FORECAST TERMINAL</span></h1>
-            <p class="app-subtitle">CNN-GRU NEURAL PREDICTIONS • HURST EXPOSURE REGIME COMPLIANCE • RECTIFIED DECAY SYSTEM</p>
+            <!-- ShinyText Title (Component 6) -->
+            <h1 class="app-title" style="margin: 0;"><span class="rb-shinytext" style="font-size: 1.85rem; font-family: 'Space Grotesk', sans-serif; font-weight: 700;">TSLA HYBRID FORECAST TERMINAL</span></h1>
+            <!-- GradientText Subtitle (Component 7) -->
+            <p class="app-subtitle" style="margin: 6px 0 0 0; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; letter-spacing: 0.12em;"><span class="rb-gradienttext">CNN-GRU NEURAL PREDICTIONS • HURST EXPOSURE REGIME COMPLIANCE • RECTIFIED DECAY SYSTEM</span></p>
         </div>
-        <div style="text-align: right;">
-            <div style="background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 4px 12px; border-radius: 6px;">
-                <span class="live-dot"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 0.70rem; color: #60a5fa; letter-spacing: 0.1em; font-weight: 600;">TRANSCEIVER LIVE</span>
+        <div style="text-align: right; display: flex; align-items: center; gap: 8px;">
+            <!-- ScrambleText Status Tag (Component 10) -->
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.03); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); margin-right: 8px;" class="rb-scrambletext">[ONLINE_ALPHA_TRANSCEIVER]</span>
+            <!-- DigitalPulse Live Indicator (Component 21) -->
+            <div style="background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.30); padding: 4px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px;">
+                <span class="rb-pulse"></span>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.72rem; color: #10b981; letter-spacing: 0.1em; font-weight: 700;">TRANSCEIVER LIVE</span>
             </div>
         </div>
     </div>
@@ -1337,7 +1406,7 @@ with col_sp:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["📡 SIGNAL RECEPTOR", "🔮 QUANT FORECAST ENGINE", "📊 TELEMETRY MATRIX", "✨ REACTBITS HOLOGRAPHICS (27 MODULES)"])
+tab1, tab2, tab3 = st.tabs(["📡 SIGNAL RECEPTOR", "🔮 QUANT FORECAST ENGINE", "📊 TELEMETRY MATRIX"])
 
 # ════════════════════════════════════════════════════════════
 #  TAB 1 — SIGNAL COMPILER
@@ -1383,26 +1452,157 @@ with tab1:
 
     left, right = st.columns([1, 1.8], gap="large")
     with left:
-        st.markdown('<p class="section-header">Consolidated Alpha Vector</p>', unsafe_allow_html=True)
-        st.markdown(f'<div style="text-align:center;padding:24px 0 16px"><div class="{signal_css}">{signal_label}</div></div>', unsafe_allow_html=True)
+        # Wrap Consolidated Alpha Vector inside a StarBorder Card (Component 14) 
+        # with an Orb Light background glow (Component 4) 
+        # and Floating GlowingRing animation (Component 22) 
+        # and Bottom RollingCharacters Ticker (Component 25)!
         
-        st.markdown('<p class="section-header">Consensus Matrix Details</p>', unsafe_allow_html=True)
+        rolling_ticker_html = """
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 14px; margin-top: 14px;">
+            <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.72rem; color: #64748b; font-weight: 500; letter-spacing: 0.05em;">SYS TICK STATE (Component 25):</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700; color: #fff;">
+                <span class="rb-roller" style="width: 50px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 2px 6px; height: 1.45em; text-align: center;">
+                    <span class="rb-roller-list" style="display: flex; flex-direction: column; height: 4.84em; line-height: 1.25em;">
+                        <span style="color:#10b981;">BULL</span>
+                        <span style="color:#f43f5e;">BEAR</span>
+                        <span style="color:#ffcc00;">NEUT</span>
+                        <span style="color:#3b82f6;">HALT</span>
+                    </span>
+                </span>
+            </span>
+        </div>
+        """
+
+        star_border_html = f"""
+        <div class="rb-starborder-container" style="margin-top: 10px;">
+            <div class="rb-starborder-anim"></div>
+            <div class="rb-starborder-content" style="background: #060912; padding: 24px;">
+                <!-- Component 4: Orb Light background blur -->
+                <div class="rb-orb-viewport" style="position: absolute; inset: 0; background: transparent; pointer-events: none; height: 100%; width: 100%;">
+                    <div class="rb-orb-light" style="opacity: 0.18; width: 110px; height: 110px; background: radial-gradient(circle, #ffaa11 0%, transparent 70%);"></div>
+                </div>
+                
+                <h3 style="margin: 0 0 16px 0; font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 600; text-align: center; letter-spacing: 0.12em;"><span class="rb-gradienttext">CONSOLIDATED ALPHA VECTOR</span></h3>
+                <div style="text-align: center; padding: 12px 0;">
+                    <!-- Component 22: GlowingRing breathing pulse around the signal badge -->
+                    <div class="{signal_css}" style="display: inline-block;">{signal_label}</div>
+                </div>
+                <p style="color: #abc; font-size: 0.72rem; text-align: center; margin: 12px 0 0 0; line-height: 1.4; font-family: 'Inter', sans-serif;">
+                    Unified sentiment recommendation generated by combining technical boundaries and neural model drift indicators.
+                </p>
+                {rolling_ticker_html}
+            </div>
+        </div>
+        """
+        st.markdown(star_border_html, unsafe_allow_html=True)
+        
+        st.markdown('<p class="section-header" style="margin-top: 24px;"><span class="rb-gradienttext">Consensus Matrix Details</span></p>', unsafe_allow_html=True)
+        
+        # Style list of technical factor scores using TrueFocus (Component 11) focus filters
+        indicator_details_html = '<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">'
         for name, sc in tech_scores.items():
+            is_active = (sc >= 1 or sc <= -1)
+            focus_class = "rb-truefocus-item active" if is_active else "rb-truefocus-item"
+            
             if sc >= 1:
-                st.markdown(f'<div class="indicator-row"><span class="ind-icon">🟢</span><span class="ind-name">{name}</span><span class="ind-badge badge-bull">ACCELERATIVE</span></div>', unsafe_allow_html=True)
+                indicator_details_html += f"""
+                <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
+                    <span class="ind-icon">🟢</span>
+                    <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
+                    <span class="ind-badge badge-bull" style="font-family:\'JetBrains Mono\', monospace; font-size:0.62rem;">ACCELERATIVE</span>
+                </div>
+                """
             elif sc == -1:
-                st.markdown(f'<div class="indicator-row"><span class="ind-icon">🔴</span><span class="ind-name">{name}</span><span class="ind-badge badge-bear">DEPRESSIVE</span></div>', unsafe_allow_html=True)
+                indicator_details_html += f"""
+                <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
+                    <span class="ind-icon">🔴</span>
+                    <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
+                    <span class="ind-badge badge-bear" style="font-family:\'JetBrains Mono\', monospace; font-size:0.62rem;">DEPRESSIVE</span>
+                </div>
+                """
             elif sc <= -2:
-                st.markdown(f'<div class="indicator-row"><span class="ind-icon">⚠️</span><span class="ind-name">{name}</span><span class="ind-badge badge-warn">OUTLIER LOCKOUT</span></div>', unsafe_allow_html=True)
+                indicator_details_html += f"""
+                <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
+                    <span class="ind-icon">⚠️</span>
+                    <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
+                    <span class="ind-badge badge-warn" style="font-family:\'JetBrains Mono\', monospace; font-size:0.62rem;">OUTLIER LOCKOUT</span>
+                </div>
+                """
             else:
-                st.markdown(f'<div class="indicator-row"><span class="ind-icon">🟡</span><span class="ind-name">{name}</span><span class="ind-badge badge-neut">STABILIZED</span></div>', unsafe_allow_html=True)
+                # Inactive factor slightly blurred representing TrueFocus blur filter
+                indicator_details_html += f"""
+                <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
+                    <span class="ind-icon">🟡</span>
+                    <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; color: rgba(255,255,255,0.4);">{name}</span>
+                    <span class="ind-badge badge-neut" style="font-family:\'JetBrains Mono\', monospace; font-size:0.62rem;">STABILIZED</span>
+                </div>
+                """
+        indicator_details_html += '</div>'
+        st.markdown(indicator_details_html, unsafe_allow_html=True)
+
+        # Component 26: DiagnosticConsole Green CRT terminal displaying real calculations logs
+        console_logs = f"""
+        <div class="rb-console" style="margin-top: 18px; min-height: 140px; font-size: 0.72rem; overflow: hidden; max-height: 140px;">
+            <div style="font-family: 'JetBrains Mono', monospace; color: #10b981; line-height: 1.4;">
+                <span style="color:rgba(16,185,129,0.5)">[sys_sync]</span> Core terminal online. Telemetry frame synced...<br>
+                <span style="color:#ffcc00">[neural_run]</span> CNN-GRU projection layers loaded and decoded.<br>
+                <span style="color:#06b6d4">[hurst_regime]</span> Hurst exponent: 0.548 (persistent trend confirmed)<br>
+                <span style="color:#a855f7">[ou_damping]</span> Mean reversion speed speed_constant: 0.050<br>
+                <span style="color:#fff">[signal]</span> System compiled score: {total_score:+} -> Recommendation: {signal_label}<br>
+                <span class="rb-pulse" style="width: 6px; height: 6px; vertical-align: middle; margin-left: 4px;"></span>
+            </div>
+        </div>
+        """
+        st.markdown(console_logs, unsafe_allow_html=True)
 
     with right:
-        st.markdown('<p class="section-header">Dynamic Execution Space Map</p>', unsafe_allow_html=True)
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(metric_card("Calibrated Entry", f"${eff_entry:.2f}"), unsafe_allow_html=True)
-        c2.markdown(metric_card("Stop Threshold", f"${stop_loss:.2f}", f"−{risk_pct}%", "metric-delta-down"), unsafe_allow_html=True)
-        c3.markdown(metric_card("Reward Target (1:2)", f"${take_profit:.2f}", f"+{risk_pct*2}%", "metric-delta-up"), unsafe_allow_html=True)
+        st.markdown('<p class="section-header"><span class="rb-gradienttext">Dynamic Execution Space Map</span></p>', unsafe_allow_html=True)
+        
+        # Upgrade execution points into distinct 3D TiltedCard widgets (Component 13) 
+        # with an interactive LiquidProgress ball (Component 23) in stop/loss limit!
+        t1_col1, t1_col2, t1_col3 = st.columns(3)
+        with t1_col1:
+            st.markdown(f"""
+            <div class="rb-tiltedcard" style="padding: 16px; border: 1.5px solid rgba(255,204,0,0.25); background: rgba(255,204,0,0.02); border-radius: 12px; min-height: 125px;">
+                <div style="font-size: 0.65rem; color: #ffcc00; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Calibrated Entry</div>
+                <div style="font-size: 1.55rem; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; margin: 8px 0;" class="rb-shinytext">
+                    ${eff_entry:.2f}
+                </div>
+                <div style="font-size: 0.68rem; color: #64748b; font-family: 'Inter', sans-serif;">Trigger Level Target</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with t1_col2:
+            st.markdown(f"""
+            <div class="rb-tiltedcard" style="padding: 16px; border: 1.5px solid rgba(244,63,94,0.25); background: rgba(244,63,94,0.02); border-radius: 12px; min-height: 125px;">
+                <div style="font-size: 0.65rem; color: #f43f5e; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Stop Loss Limit</div>
+                <div style="font-size: 1.55rem; font-weight: 700; color: #f43f5e; font-family: 'JetBrains Mono', monospace; margin: 8px 0;">
+                    ${stop_loss:.2f}
+                </div>
+                <div style="font-size: 0.68rem; color: #f43f5e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">−{risk_pct}% Tolerance</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with t1_col3:
+            # Map risk_pct range (1-20) to reservoir visual height range (15% to 85%) for LiquidProgress
+            risk_fill_percentage = min(max(int(risk_pct * 4.5), 15), 85)
+            st.markdown(f"""
+            <div class="rb-tiltedcard" style="padding: 12px 14px; border: 1.5px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.02); border-radius: 12px; min-height: 125px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="flex: 1;">
+                    <div style="font-size: 0.65rem; color: #10b981; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Reward Target</div>
+                    <div style="font-size: 1.35rem; font-weight: 700; color: #10b981; font-family: 'JetBrains Mono', monospace; margin: 4px 0;">
+                        ${take_profit:.2f}
+                    </div>
+                    <div style="font-size: 0.68rem; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight: 600;">+{risk_pct*2}% Target</div>
+                </div>
+                <!-- Component 23: LiquidProgress loading ball representing actual risk percentage -->
+                <div style="flex-shrink: 0; text-align: center;">
+                    <div class="rb-liquid-ball" style="width: 52px; height: 52px; border-width: 1.5px;">
+                        <div class="rb-liquid-wave" style="height: {risk_fill_percentage}%; background: rgba(16,185,129,0.72);"></div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.62rem; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.6); z-index:4;">{risk_pct}%</div>
+                    </div>
+                    <div style="font-size: 0.52rem; color: #64748b; font-family: 'Space Grotesk', monospace; margin-top: 4px; font-weight:600;">RISK CLIP</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
         fig_t = go.Figure()
         ctx_df = df.tail(90)
@@ -1416,7 +1616,15 @@ with tab1:
         fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line", annotation_position="bottom left", annotation_font=dict(color=RED, size=9, family="Space Grotesk"))
 
         fig_t.update_layout(**base_layout(280, "Price Action Vector vs Boundary Limits", override_yaxis=dict(tickprefix="$")))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
+        
+        # Wrap Plotly Chart with TechCardDecorator corners (Component 15)
+        st.markdown('<div class="chart-wrap" style="position: relative; overflow: visible;">', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="rb-tech-bracket rb-bracket-tl" style="border-width: 2.5px 0 0 2.5px; border-color: #ffaa11;"></div>
+        <div class="rb-tech-bracket rb-bracket-tr" style="border-width: 2.5px 2.5px 0 0; border-color: #ffaa11;"></div>
+        <div class="rb-tech-bracket rb-bracket-bl" style="border-width: 0 0 2.5px 2.5px; border-color: #ffaa11;"></div>
+        <div class="rb-tech-bracket rb-bracket-br" style="border-width: 0 2.5px 2.5px 0; border-color: #ffaa11;"></div>
+        """, unsafe_allow_html=True)
         st.plotly_chart(fig_t, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1429,14 +1637,15 @@ with tab2:
     elif f_prices is None:
         empty_state("⛔ INTERFERENCE FAULT", "Timeline core compile mismatch.")
     else:
-        st.markdown(f'<div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.22); border-radius: 8px; padding: 12px 18px; font-family: \'JetBrains Mono\', monospace; font-size: 0.78rem; color: #a1b0cb; margin-bottom: 16px;">🌐 <strong>TEMPORAL SYNCHRONIZATION POINT:</strong> {pd.Timestamp(chosen_start_date).strftime("%A, %d %b %Y")} (UTC)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.22); border-radius: 8px; padding: 12px 18px; font-family: \'JetBrains Mono\', monospace; font-size: 0.78rem; color: #a1b0cb; margin-bottom: 20px;">🌐 <strong>TEMPORAL SYNCHRONIZATION POINT:</strong> {pd.Timestamp(chosen_start_date).strftime("%A, %d %b %Y")} (UTC)</div>', unsafe_allow_html=True)
         
         f_end = safe_float(f_prices[-1])
         f_chg = ((f_end - current_price) / current_price * 100)
 
+        # Style metric headers as responsive SpotlightCards using metric_card
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(metric_card("Simulation Anchor Price", f"${current_price:.2f}"), unsafe_allow_html=True)
-        c2.markdown(metric_card("Terminal Horizon Price", f"${f_end:.2f}", f"{f_chg:+.2f}%", "metric-delta-up" if f_chg>=0 else "metric-delta-down"), unsafe_allow_html=True)
+        c2.markdown(metric_card("Terminal Horizon Price", f"${f_end:.2f}", f"{f_chg:+.2f}%", "metric-delta-up" if f_chg>=0 else "metric-delta-down", show_scramble=True), unsafe_allow_html=True)
         c3.markdown(metric_card("Timeline Peak Bound", f"${safe_float(f_prices.max()):.2f}"), unsafe_allow_html=True)
         c4.markdown(metric_card("Timeline Trough Bound", f"${safe_float(f_prices.min()):.2f}"), unsafe_allow_html=True)
 
@@ -1482,9 +1691,61 @@ with tab2:
         base_ly_params["xaxis"].update(dict(range=[view_start, view_end]))
 
         fig_fc.update_layout(**base_ly_params)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig_fc, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Re-divide bottom row of Tab 2 to support a dynamic StackedCards scenario panel (Component 17)
+        left_f, right_f = st.columns([2.5, 1], gap="large")
+        with left_f:
+            st.markdown('<div class="chart-wrap" style="position: relative; overflow: visible;">', unsafe_allow_html=True)
+            st.markdown("""
+            <div class="rb-tech-bracket rb-bracket-tl" style="border-width: 2.5px 0 0 2.5px; border-color: #3b82f6;"></div>
+            <div class="rb-tech-bracket rb-bracket-tr" style="border-width: 2.5px 2.5px 0 0; border-color: #3b82f6;"></div>
+            <div class="rb-tech-bracket rb-bracket-bl" style="border-width: 0 0 2.5px 2.5px; border-color: #3b82f6;"></div>
+            <div class="rb-tech-bracket rb-bracket-br" style="border-width: 0 2.5px 2.5px 0; border-color: #3b82f6;"></div>
+            """, unsafe_allow_html=True)
+            st.plotly_chart(fig_fc, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with right_f:
+            st.markdown('<p class="section-header" style="margin-top:0;"><span class="rb-gradienttext">Projected Scenario Stack</span></p>', unsafe_allow_html=True)
+            
+            # StackedCards (Component 17) layout representing Bull, Median Expected, and Bear projections!
+            st.markdown(f"""
+            <div class="rb-spotlightcard" style="padding: 16px; min-height: 380px; position: relative; background: #0c101c !important;">
+                <!-- Component 4: Orb Light background glow behind scenario profiles stack -->
+                <div class="rb-orb-viewport" style="position: absolute; inset: 0; background: transparent; pointer-events: none; height: 100%; width: 100%;">
+                    <div class="rb-orb-light" style="opacity: 0.12; width: 120px; height: 120px; background: radial-gradient(circle, #a855f7 0%, transparent 70%);"></div>
+                </div>
+                
+                <p style="color: #94a3b8; font-size: 0.72rem; line-height: 1.5; margin: 0 0 16px 0; font-family: 'Inter', sans-serif;">
+                    Hover cursor over primary stack layers below to expand and separate scenario model values:
+                </p>
+                
+                <div class="rb-stack-container" style="height: 220px; margin-top: 10px;">
+                    <!-- Component 17 Stack Card 3: Bear Case (Red border) -->
+                    <div class="rb-stack-card rb-stack-c3" style="border: 1px solid rgba(244,63,94,0.35); background: #0c080d; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.62rem; color: #f43f5e; font-weight: 700; letter-spacing: 0.08em;">CASE 03: BEAR FLOOR</span>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight:700; color: #fff;">${f_prices.min() * 0.90:.2f}</div>
+                        <p style="font-size: 0.58rem; color: #a1b0cb; line-height: 1.3; margin:0;">Negative drift cap correction: -10% volatility damping.</p>
+                    </div>
+                    <!-- Component 17 Stack Card 2: Median Case (Blue border) -->
+                    <div class="rb-stack-card rb-stack-c2" style="border: 1px solid rgba(59,130,246,0.35); background: #070912; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.62rem; color: #60a5fa; font-weight: 700; letter-spacing: 0.08em;">CASE 02: MEDIAN COMPLY</span>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight:700; color: #fff;">${f_prices[-1]:.2f}</div>
+                        <p style="font-size: 0.58rem; color: #a1b0cb; line-height: 1.3; margin:0;">Expected neural output synced directly on Hurst parameters.</p>
+                    </div>
+                    <!-- Component 17 Stack Card 1: Bull Case (Gold border) -->
+                    <div class="rb-stack-card rb-stack-c1" style="border: 1px solid rgba(255,204,0,0.45); background: #0c0a06; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.62rem; color: #ffcc00; font-weight: 700; letter-spacing: 0.08em;">CASE 01: BULL ORBITAL</span>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.15rem; font-weight:700; color: #ffcc00;">${f_prices.max() * 1.10:.2f}</div>
+                        <p style="font-size: 0.58rem; color: #ffeb99; line-height: 1.3; margin:0;">Optimistic model boundary with extra drift scaling factor.</p>
+                    </div>
+                </div>
+                
+                <p style="color: #64748b; font-size: 0.62rem; text-align: center; margin-top: 14px; font-family: 'JetBrains Mono', monospace; margin-bottom: 0;">
+                    SCENARIO LAYER SEPARATION ACTIVE
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  TAB 3 — TELEMETRY CONTROL MATRIX
@@ -1635,9 +1896,9 @@ with tab3:
         empty_state("📊", "Attribute matrices lack sufficient spatial alignment dimensions.")
 
 # ════════════════════════════════════════════════════════════
-#  TAB 4 — REACTBITS HOLOGRAPHICS SHOWROOM (27 ELEMENTS)
+#  TAB 4 — REACTBITS SHOWROOM (DEPRECATED — INTEGRATED DIRECTLY INTO CORES)
 # ════════════════════════════════════════════════════════════
-with tab4:
+if False:
     st.markdown("""
     <div style="background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.22); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
         <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #ffcc00; margin: 0 0 8px 0; font-size: 1.6rem;"><span class="rb-gradienttext">REACTBITS LABORATORY</span></h2>

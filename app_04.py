@@ -716,6 +716,9 @@ with tab1:
     bb_up    = safe_float(df["BB_Upper"].dropna().iloc[-1] if df["BB_Upper"].dropna().any() else np.nan)
     bb_lo    = safe_float(df["BB_Lower"].dropna().iloc[-1] if df["BB_Lower"].dropna().any() else np.nan)
 
+    # Ensure entry price reflects either custom input or falls back gracefully to current market value
+    eff_entry = entry_price if entry_price > 0.0 else current_price
+
     tech_scores = {
         "RSI (14)": 1 if rsi_now < 30 else (-1 if rsi_now > 70 else 0),
         "MACD vs Signal": 1 if macd_now > sig_now else -1,
@@ -724,9 +727,22 @@ with tab1:
     }
 
     if f_prices is not None:
+        # Evaluate model forecast trajectory against your SPECIFIC execution entry point rather than current close
         model_target = safe_float(f_prices[min(4, len(f_prices)-1)])
-        model_pct = (model_target - current_price) / current_price * 100
+        model_pct = (model_target - eff_entry) / eff_entry * 100
         tech_scores["Model (5-day)"] = 1 if model_pct > 1.5 else (-1 if model_pct < -1.5 else 0)
+
+    # Entry Valuation Strain Factor
+    # If a user sets an entry price significantly above the current market price, penalize the entry strategy heavily.
+    valuation_premium = (eff_entry - current_price) / current_price * 100
+    if valuation_premium > 5.0:
+        # Slashing score if buying over a 5% premium to prevent chasing an overpriced execution entry
+        tech_scores["Entry Premium Guard"] = -2 
+    elif valuation_premium < -5.0:
+        # Extra points if buying at a deep discount relative to live market prints
+        tech_scores["Entry Premium Guard"] = 1
+    else:
+        tech_scores["Entry Premium Guard"] = 0
 
     total_score = sum(tech_scores.values())
     if total_score >= 2:    signal_label, signal_css = "BUY",  "signal-buy"
@@ -743,8 +759,16 @@ with tab1:
         
         st.markdown('<p class="section-header">Breakdown Parameters</p>', unsafe_allow_html=True)
         for name, sc in tech_scores.items():
-            lbl = "Bullish" if sc == 1 else ("Bearish" if sc == -1 else "Neutral")
-            icon = "🟢" if sc == 1 else ("🔴" if sc == -1 else "🟡")
+            # FIXED: Handles the custom -2 score gracefully without broken text tags
+            if sc >= 1:
+                lbl, icon = "Bullish", "🟢"
+            elif sc == -1:
+                lbl, icon = "Bearish", "🔴"
+            elif sc <= -2:
+                lbl, icon = "Overpriced Target Penalty", "🚨"
+            else:
+                lbl, icon = "Neutral", "🟡"
+                
             st.markdown(f"{icon} &nbsp;**{name}** — {lbl}")
 
     with right:

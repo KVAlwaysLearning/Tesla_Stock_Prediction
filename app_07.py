@@ -251,7 +251,7 @@ section[data-testid="stSidebar"] > div {
 }
 .metric-delta-up   { color: #10b981; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-weight: 500;}
 .metric-delta-down { color: #f43f5e; font-size: 0.82rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-weight: 500;}
-.metric-muted      { color: #64748b; font-size: 0.82rem; margin-top: 4px; }
+.metric-muted      { color: #64748b; font-size: 0.78rem; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
 
 /* ═══════════════════════════════════════════════
    PULSING SIGNAL BADGE (reactbits: Glowing Ring)
@@ -636,10 +636,23 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
 /* 14. TRUEFOCUS */
 .rb-truefocus-item {
   font-family: 'Space Grotesk', sans-serif; display: inline-block; font-size: 1.02rem; color: rgba(255,255,255,0.3);
-  filter: blur(2.5px); transition: filter 0.3s ease, color 0.3s ease, transform 0.3s ease;
+  filter: blur(2.5px); transition: filter 0.3s ease, color 0.3s ease, transform 0.3s ease, background 0.3s ease, border-color 0.3s ease;
 }
 .rb-truefocus-item.active {
-  filter: blur(0); color: #ffcc00; font-weight: 700; transform: scale(1.08);
+  filter: blur(0); color: #ffcc00; font-weight: 700; transform: scale(1.04);
+}
+/* TrueFocus group hover centering: when hovering the container, blur all rows slightly, except the hovered one */
+.rb-consensus-matrix-container:hover .rb-truefocus-item {
+  filter: blur(1.8px) !important;
+  opacity: 0.45 !important;
+  transform: scale(0.97) !important;
+}
+.rb-consensus-matrix-container:hover .rb-truefocus-item:hover {
+  filter: blur(0) !important;
+  opacity: 1 !important;
+  transform: scale(1.02) !important;
+  background: rgba(59,130,246,0.08) !important;
+  border-color: rgba(59,130,246,0.22) !important;
 }
 
 /* 15. ROLLINGCHARACTERS */
@@ -1051,6 +1064,49 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
 }
 .rb-infinite-scroll-container:hover .rb-infinite-scroll-content {
   animation-play-state: paused !important;
+}
+
+/* Beautiful Shimmer/Animation Button style for graph titles on top of charts */
+.rb-graph-title-btn {
+  background: linear-gradient(90deg, #090c15, #17223b, #090c15);
+  background-size: 200% auto;
+  border: 1.2px solid rgba(255, 204, 0, 0.45) !important;
+  animation: rb-shimmer-pass 3s linear infinite !important;
+  border-radius: 20px !important;
+  color: #ffcc00 !important;
+  padding: 6px 16px !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 0.77rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  display: inline-block !important;
+  text-align: center !important;
+  margin: 0 auto 12px auto !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+
+/* Enhanced hover trigger support for Project Scenario Stack expansion */
+.rb-stack-hover-trigger:hover .rb-stack-container {
+  height: 290px !important;
+}
+.rb-stack-hover-trigger:hover .rb-stack-c1 {
+  transform: translateY(0px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 10 !important;
+  box-shadow: 0 8px 24px rgba(255,204,0,0.15) !important;
+}
+.rb-stack-hover-trigger:hover .rb-stack-c2 {
+  transform: translateY(90px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 9 !important;
+  box-shadow: 0 8px 24px rgba(59,130,246,0.12) !important;
+}
+.rb-stack-hover-trigger:hover .rb-stack-c3 {
+  transform: translateY(180px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 8 !important;
+  box-shadow: 0 8px 24px rgba(244,63,94,0.12) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1836,10 +1892,14 @@ with tab1:
                 """
         
         indicator_details_html = f"""
-        <div class="rb-infinite-scroll-container">
+        <div class="rb-infinite-scroll-container rb-consensus-matrix-container">
             <div class="rb-infinite-scroll-content">
-                {single_items_html}
-                {single_items_html}
+                <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px;">
+                    {single_items_html}
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px;">
+                    {single_items_html}
+                </div>
             </div>
         </div>
         """
@@ -2029,7 +2089,7 @@ with tab2:
             
             # StackedCards (Component 17) layout representing Bull, Median Expected, and Bear projections!
             st.markdown(clean_html(f"""
-            <div class="rb-spotlightcard" style="padding: 16px; min-height: 380px; position: relative; background: #0c101c !important;">
+            <div class="rb-spotlightcard rb-stack-hover-trigger" style="padding: 16px; min-height: 380px; position: relative; background: #0c101c !important;">
                 <!-- Component 4: Orb Light background glow behind scenario profiles stack -->
                 <div class="rb-orb-viewport" style="position: absolute; inset: 0; background: transparent; pointer-events: none; height: 100%; width: 100%;">
                     <div class="rb-orb-light" style="opacity: 0.12; width: 120px; height: 120px; background: radial-gradient(circle, #a855f7 0%, transparent 70%);"></div>
@@ -2190,59 +2250,59 @@ with tab3:
     st.markdown('<div class="flying-posters-viewport">', unsafe_allow_html=True)
 
     # Poster 1
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🛰️ CONTINUOUS CLOSE PRICING SEQUENCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">🛰️ CONTINUOUS CLOSE PRICING SEQUENCE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 2
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📊 SEGMENTED BAR VOLUME DISTRIBUTION</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">📊 SEGMENTED BAR VOLUME DISTRIBUTION</div>', unsafe_allow_html=True)
     st.plotly_chart(fig2, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 3
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🕯️ HOLOGRAPHIC CANDLESTICK ENVELOPE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">🕯️ HOLOGRAPHIC CANDLESTICK ENVELOPE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 4
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📈 INTRADAY DISPERSION BOUNDS VARIANCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">📈 INTRADAY DISPERSION BOUNDS VARIANCE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig4, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 5
     if fig5 is not None:
-        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📉 MOMENTUM CONVERGENCE CONTOUR</div>', unsafe_allow_html=True)
+        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+        st.markdown('<div class="rb-graph-title-btn">📉 MOMENTUM CONVERGENCE CONTOUR</div>', unsafe_allow_html=True)
         st.plotly_chart(fig5, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 6
     if fig6 is not None:
-        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📶 STRENGTH VELOCITY RSI OSCILLATOR</div>', unsafe_allow_html=True)
+        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+        st.markdown('<div class="rb-graph-title-btn">📶 STRENGTH VELOCITY RSI OSCILLATOR</div>', unsafe_allow_html=True)
         st.plotly_chart(fig6, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 7
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📅 MACRO ANNUALIZED PRICE ASSETS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">📅 MACRO ANNUALIZED PRICE ASSETS</div>', unsafe_allow_html=True)
     st.plotly_chart(fig7, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 8
-    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">❄️ SEASONALITY DISTRIBUTION MATRICES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+    st.markdown('<div class="rb-graph-title-btn">❄️ SEASONALITY DISTRIBUTION MATRICES</div>', unsafe_allow_html=True)
     st.plotly_chart(fig8, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 9
     if fig11 is not None:
-        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
-        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🧬 ATTRIBUTE CORRELATION MATRIX</div>', unsafe_allow_html=True)
+        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
+        st.markdown('<div class="rb-graph-title-btn">🧬 ATTRIBUTE CORRELATION MATRIX</div>', unsafe_allow_html=True)
         st.plotly_chart(fig11, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 

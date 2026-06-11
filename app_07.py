@@ -972,6 +972,34 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
   z-index: 99 !important;
   animation-play-state: paused !important;
 }
+
+/* ═══════════════════════════════════════════════
+   30. INFINITE SCROLL MATRIX
+═══════════════════════════════════════════════ */
+.rb-infinite-scroll-container {
+  overflow: hidden !important;
+  position: relative !important;
+  height: 220px !important;
+  width: 100% !important;
+  border: 1px solid rgba(59,130,246,0.12) !important;
+  border-radius: 8px !important;
+  background: rgba(12,16,28,0.3) !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+}
+.rb-infinite-scroll-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  animation: rb-vertical-scroll 25s linear infinite !important;
+}
+@keyframes rb-vertical-scroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.rb-infinite-scroll-container:hover .rb-infinite-scroll-content {
+  animation-play-state: paused !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1443,6 +1471,10 @@ except Exception as _scaler_err:
 # ║                    SIDEBAR CONTROLS                      ║
 # ╚══════════════════════════════════════════════════════════╝
 
+# Implicit dynamic model config values
+gdrive_url = ""
+load_btn = False
+
 # Critical configuration sidebar with optimized scrolling styling and interactive nodes
 with st.sidebar:
     # ShinyText on header
@@ -1482,34 +1514,17 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # GradientText + Noise (Component 7 / 3) + 3D TiltedCard (Component 13)
-    st.markdown('<p class="section-header"><span class="rb-gradienttext">Model Engine Control</span></p>', unsafe_allow_html=True)
-    
-    st.markdown(clean_html("""
-    <div class="rb-tiltedcard rb-noise-bg" style="padding: 12px; border: 1.5px solid rgba(59,130,246,0.18); background: rgba(59,130,246,0.02); border-radius: 8px; margin-bottom: 12px; overflow: visible; position: relative;">
-        <div style="font-size: 0.62rem; color: #60a5fa; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-bottom: 6px;">TILT SECURE MODEL LINK</div>
-    """), unsafe_allow_html=True)
-    
-    gdrive_url = st.text_input(
-        "Network Cloud Model Link", value=secret_url, type="password",
-        help="Model artifact download link"
-    )
-    
-    st.markdown(clean_html("</div>"), unsafe_allow_html=True)
-    
-    load_btn = st.button("⬇ INITIALIZE CORE ENGINE", type="primary")
- 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
         model_status_slot.markdown(clean_html("""
-        <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+        <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
             <span class="rb-pulse"></span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">🟢 CORE PROTOCOLS ONLINE</span>
         </div>
         """), unsafe_allow_html=True)
     else:
         model_status_slot.markdown(clean_html("""
-        <div class="rb-bounce-card" style="background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+        <div class="rb-bounce-card" style="background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
             <span class="rb-pulse" style="background:#f43f5e; box-shadow: 0 0 8px #f43f5e;"></span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #f43f5e; font-weight: 700;">⏳ Transceiver Link Pending</span>
         </div>
@@ -1729,13 +1744,13 @@ with tab1:
         st.markdown('<p class="section-header" style="margin-top: 24px;"><span class="rb-gradienttext">Consensus Matrix Details</span></p>', unsafe_allow_html=True)
         
         # Style list of technical factor scores using TrueFocus (Component 11) focus filters
-        indicator_details_html = '<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">'
+        single_items_html = ""
         for name, sc in tech_scores.items():
             is_active = (sc >= 1 or sc <= -1)
             focus_class = "rb-truefocus-item active" if is_active else "rb-truefocus-item"
             
             if sc >= 1:
-                indicator_details_html += f"""
+                single_items_html += f"""
                 <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
                     <span class="ind-icon">🟢</span>
                     <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
@@ -1743,7 +1758,7 @@ with tab1:
                 </div>
                 """
             elif sc == -1:
-                indicator_details_html += f"""
+                single_items_html += f"""
                 <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
                     <span class="ind-icon">🔴</span>
                     <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
@@ -1751,7 +1766,7 @@ with tab1:
                 </div>
                 """
             elif sc <= -2:
-                indicator_details_html += f"""
+                single_items_html += f"""
                 <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
                     <span class="ind-icon">⚠️</span>
                     <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 600; color: #fff;">{name}</span>
@@ -1760,25 +1775,29 @@ with tab1:
                 """
             else:
                 # Inactive factor slightly blurred representing TrueFocus blur filter
-                indicator_details_html += f"""
+                single_items_html += f"""
                 <div class="indicator-row {focus_class}" style="overflow: visible; width: 100%;">
                     <span class="ind-icon">🟡</span>
                     <span class="ind-name" style="font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; color: rgba(255,255,255,0.4);">{name}</span>
                     <span class="ind-badge badge-neut" style="font-family:\'JetBrains Mono\', monospace; font-size:0.62rem;">STABILIZED</span>
                 </div>
                 """
-        indicator_details_html += '</div>'
+        
+        indicator_details_html = f"""
+        <div class="rb-infinite-scroll-container">
+            <div class="rb-infinite-scroll-content">
+                {single_items_html}
+                {single_items_html}
+            </div>
+        </div>
+        """
         st.markdown(indicator_details_html, unsafe_allow_html=True)
 
         # Component 26: DiagnosticConsole Green CRT terminal displaying real calculations logs
         console_logs = f"""
-        <div class="rb-console" style="margin-top: 18px; min-height: 140px; font-size: 0.72rem; overflow: hidden; max-height: 140px;">
+        <div class="rb-console" style="margin-top: 18px; min-height: 50px; font-size: 0.72rem; overflow: hidden; max-height: 70px; padding: 12px 18px;">
             <div style="font-family: 'JetBrains Mono', monospace; color: #10b981; line-height: 1.4;">
-                <span style="color:rgba(16,185,129,0.5)">[sys_sync]</span> Core terminal online. Telemetry frame synced...<br>
-                <span style="color:#ffcc00">[neural_run]</span> CNN-GRU projection layers loaded and decoded.<br>
-                <span style="color:#06b6d4">[hurst_regime]</span> Hurst exponent: 0.548 (persistent trend confirmed)<br>
-                <span style="color:#a855f7">[ou_damping]</span> Mean reversion speed speed_constant: 0.050<br>
-                <span style="color:#fff">[signal]</span> System compiled score: {total_score:+} -> Recommendation: {signal_label}<br>
+                <span style="color:#fff">[signal]</span> System compiled score: {total_score:+} &rarr; Recommendation: {signal_label}
                 <span class="rb-pulse" style="width: 6px; height: 6px; vertical-align: middle; margin-left: 4px;"></span>
             </div>
         </div>
@@ -1845,7 +1864,16 @@ with tab1:
         fig_t.add_hline(y=take_profit, line_color=GREEN, line_width=1.2, line_dash="dash", annotation_text="Take Profit Threshold (1:2)", annotation_position="top left", annotation_font=dict(color=GREEN, size=9, family="Space Grotesk"))
         fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line", annotation_position="bottom left", annotation_font=dict(color=RED, size=9, family="Space Grotesk"))
 
-        fig_t.update_layout(**base_layout(280, "Price Action Vector vs Boundary Limits", override_yaxis=dict(tickprefix="$")))
+        fig_t.update_layout(**base_layout(320, "Price Action Vector vs Boundary Limits", override_yaxis=dict(tickprefix="$")))
+        fig_t.update_layout(
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.18,
+                xanchor="center",
+                x=0.5
+            )
+        )
         
         # Wrap Plotly Chart with TechCardDecorator corners (Component 15)
         st.markdown('<div class="chart-wrap" style="position: relative; overflow: visible;">', unsafe_allow_html=True)
@@ -2043,24 +2071,24 @@ with tab3:
     for c, col_color in [("MA30", BLUE), ("MA90", PURPLE)]:
         if c in dv.columns and dv[c].notna().any():
             fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
-    fig1.update_layout(**base_layout(240, "Continuous Close Pricing Sequence"))
+    fig1.update_layout(**base_layout(380, "Continuous Close Pricing Sequence"))
 
     # Fig 2: Segmented Bar Volume Distribution
     v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
     fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Stream"))
-    fig2.update_layout(**base_layout(240, "Segmented Bar Volume Distribution"))
+    fig2.update_layout(**base_layout(380, "Segmented Bar Volume Distribution"))
 
     # Fig 3: Holographic Structural Candlestick Envelope
     fig3 = go.Figure(go.Candlestick(x=dv.index, open=dv["Open"], high=dv["High"], low=dv["Low"], close=dv["Close"], increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Candlestick"))
     if dv["BB_Upper"].notna().any():
         fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="Volatility Cell Upper", line=dict(color=MUTED, width=0.8, dash="dash")))
         fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(100,116,139,0.02)", name="Volatility Cell Lower", line=dict(color=MUTED, width=0.8, dash="dash")))
-    fig3.update_layout(**base_layout(240, "Holographic Structural Candlestick Envelope"))
+    fig3.update_layout(**base_layout(380, "Holographic Structural Candlestick Envelope"))
     fig3.update_layout(xaxis_rangeslider_visible=False)
 
     # Fig 4: Intraday Dispersion Bounds
     fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(255,204,0,0.06)", line=dict(color=ACCENT, width=1.0)))
-    fig4.update_layout(**base_layout(240, "Intraday Dispersion Bounds (High - Low Variance)"))
+    fig4.update_layout(**base_layout(380, "Intraday Dispersion Bounds (High - Low Variance)"))
 
     # Fig 5: Momentum Convergence/Divergence Oscillator (MACD)
     fig5 = None
@@ -2070,7 +2098,7 @@ with tab3:
         fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="MACD Signal", line=dict(color=ACCENT, width=1.2)), row=1, col=1)
         h_colors = [GREEN if val >= 0 else RED for val in dv["MACDHist"].fillna(0)]
         fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram Matrix", marker_color=h_colors), row=2, col=1)
-        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=240, margin=dict(l=40,r=20,t=30,b=20), title=dict(text="Momentum Convergence (12, 26, 9)", font=dict(size=11, color=MUTED, family="Space Grotesk")), showlegend=False)
+        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=380, margin=dict(l=40,r=20,t=30,b=20), title=dict(text="Momentum Convergence (12, 26, 9)", font=dict(size=11, color=MUTED, family="Space Grotesk")), showlegend=False)
         fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
 
     # Fig 6: RSI Engine
@@ -2082,12 +2110,12 @@ with tab3:
         fig6.add_hrect(y0=0,  y1=30,  fillcolor="rgba(16,185,129,0.03)", line_width=0)
         fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
         fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
-        fig6.update_layout(**base_layout(240, "Relative Strength Velocity Zone RSI (14)", override_yaxis=dict(range=[0, 100])))
+        fig6.update_layout(**base_layout(380, "Relative Strength Velocity Zone RSI (14)", override_yaxis=dict(range=[0, 100])))
 
     # Fig 7: Macro Annualized Core Price Assets
     yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
     fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
-    fig7.update_layout(**base_layout(240, "Macro Annualized Core Price Assets"))
+    fig7.update_layout(**base_layout(380, "Macro Annualized Core Price Assets"))
 
     # Fig 8: Seasonality Distribution
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -2095,7 +2123,7 @@ with tab3:
     for m_idx, m_name in enumerate(months, 1):
         sub = dv[dv.index.month == m_idx]["Close"].dropna()
         if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.12)"))
-    fig8.update_layout(**base_layout(240, "Seasonality Structural Distribution Matrices"), showlegend=False)
+    fig8.update_layout(**base_layout(380, "Seasonality Structural Distribution Matrices"), showlegend=False)
 
     # Fig 11: Correlation matrix
     fig11 = None
@@ -2104,7 +2132,7 @@ with tab3:
     if len(corr_data) >= 5 and len(corr_cols) >= 2:
         c_mat = corr_data.corr().round(3)
         fig11 = go.Figure(go.Heatmap(z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1, text=c_mat.values, texttemplate="%{text:.2f}", showscale=True))
-        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=240, margin=dict(l=40, r=20, t=10, b=40))
+        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=380, margin=dict(l=40, r=20, t=10, b=40))
 
     # Output the dynamic horizontal scroll sequence frame (Flying Posters - reactbits)
     st.markdown('<div class="flying-posters-viewport">', unsafe_allow_html=True)

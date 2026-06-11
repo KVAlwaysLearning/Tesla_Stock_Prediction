@@ -14,6 +14,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
+def clean_html(html_code: str) -> str:
+    """Strips leading whitespace from each line to prevent Streamlit's markdown parser
+    from treating indented HTML block lines (>= 4 spaces) as markdown code blocks."""
+    if not html_code:
+        return ""
+    return "\n".join(line.strip() for line in html_code.splitlines())
+
 warnings.filterwarnings("ignore")
 
 secret_url = ""
@@ -1255,35 +1262,35 @@ with st.sidebar:
     # GradientText + Noise (Component 7 / 3) + 3D TiltedCard (Component 13)
     st.markdown('<p class="section-header"><span class="rb-gradienttext">Model Engine Control</span></p>', unsafe_allow_html=True)
     
-    st.markdown("""
+    st.markdown(clean_html("""
     <div class="rb-tiltedcard rb-noise-bg" style="padding: 12px; border: 1.5px solid rgba(59,130,246,0.18); background: rgba(59,130,246,0.02); border-radius: 8px; margin-bottom: 12px; overflow: visible; position: relative;">
         <div style="font-size: 0.62rem; color: #60a5fa; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-bottom: 6px;">TILT SECURE MODEL LINK</div>
-    """, unsafe_allow_html=True)
+    """), unsafe_allow_html=True)
     
     gdrive_url = st.text_input(
         "Network Cloud Model Link", value=secret_url, type="password",
         help="Model artifact download link"
     )
     
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(clean_html("</div>"), unsafe_allow_html=True)
     
     load_btn = st.button("⬇ INITIALIZE CORE ENGINE", type="primary")
-
+ 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
-        model_status_slot.markdown("""
+        model_status_slot.markdown(clean_html("""
         <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
             <span class="rb-pulse"></span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">🟢 CORE PROTOCOLS ONLINE</span>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
     else:
-        model_status_slot.markdown("""
+        model_status_slot.markdown(clean_html("""
         <div class="rb-bounce-card" style="background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
             <span class="rb-pulse" style="background:#f43f5e; box-shadow: 0 0 8px #f43f5e;"></span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #f43f5e; font-weight: 700;">⏳ Transceiver Link Pending</span>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
 
     st.markdown("---")
     # Magnet Pill (Component 19)
@@ -1306,12 +1313,12 @@ if not st.session_state.get("model_loaded", False):
             try:
                 st.session_state["model_obj"] = load_model_cached(f_id)
                 st.session_state["model_loaded"] = True
-                model_status_slot.markdown("""
+                model_status_slot.markdown(clean_html("""
                 <div class="rb-bounce-card" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                     <span class="rb-pulse"></span>
                     <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">🟢 CORE PROTOCOLS ONLINE</span>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
             except Exception:
                 st.session_state["model_loaded"] = False
 
@@ -1325,19 +1332,19 @@ if load_btn:
                     try:
                         st.session_state["model_obj"] = load_model_cached(f_id)
                         st.session_state["model_loaded"] = True
-                        model_status_slot.markdown("""
+                        model_status_slot.markdown(clean_html("""
                         <div class="rb-bounce-card" style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                             <span class="rb-pulse"></span>
                             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #10b981; font-weight: 700;">✅ DEPLOYMENT STABILIZED</span>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """), unsafe_allow_html=True)
                     except Exception as _me:
-                        model_status_slot.markdown(f"""
+                        model_status_slot.markdown(clean_html(f"""
                         <div class="rb-bounce-card" style="background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.4); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                             <span class="rb-pulse" style="background:#f43f5e;"></span>
                             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #f43f5e; font-weight: 700;">❌ {_me}</span>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """), unsafe_allow_html=True)
 
 model = st.session_state.get("model_obj", None)
 eff_entry = entry_price if entry_price > 0.0 else current_price
@@ -1358,7 +1365,7 @@ if model is not None and scaler_ok:
 # ║                    MAIN DASHBOARD HERO                   ║
 # ╚══════════════════════════════════════════════════════════╝
 
-st.markdown("""
+st.markdown(clean_html("""
 <div class="app-header-banner rb-spotlightcard rb-noise-bg" style="position: relative; overflow: hidden; padding: 28px 32px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.22); background: #0c101c;">
     <!-- GridMotion Background Grid (Component 5) -->
     <div class="rb-gridmotion" style="position: absolute; inset: 0; height: 100%; border: none; opacity: 0.16; pointer-events: none; z-index: 1;">
@@ -1383,7 +1390,7 @@ st.markdown("""
         </div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║                    KPI METRICS BANNER                    ║
@@ -1553,16 +1560,16 @@ with tab1:
             </div>
         </div>
         """
-        st.markdown(console_logs, unsafe_allow_html=True)
+        st.markdown(clean_html(console_logs), unsafe_allow_html=True)
 
     with right:
-        st.markdown('<p class="section-header"><span class="rb-gradienttext">Dynamic Execution Space Map</span></p>', unsafe_allow_html=True)
+        st.markdown(clean_html('<p class="section-header"><span class="rb-gradienttext">Dynamic Execution Space Map</span></p>'), unsafe_allow_html=True)
         
         # Upgrade execution points into distinct 3D TiltedCard widgets (Component 13) 
         # with an interactive LiquidProgress ball (Component 23) in stop/loss limit!
         t1_col1, t1_col2, t1_col3 = st.columns(3)
         with t1_col1:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="rb-tiltedcard" style="padding: 16px; border: 1.5px solid rgba(255,204,0,0.25); background: rgba(255,204,0,0.02); border-radius: 12px; min-height: 125px;">
                 <div style="font-size: 0.65rem; color: #ffcc00; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Calibrated Entry</div>
                 <div style="font-size: 1.55rem; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; margin: 8px 0;" class="rb-shinytext">
@@ -1570,9 +1577,9 @@ with tab1:
                 </div>
                 <div style="font-size: 0.68rem; color: #64748b; font-family: 'Inter', sans-serif;">Trigger Level Target</div>
             </div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
         with t1_col2:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="rb-tiltedcard" style="padding: 16px; border: 1.5px solid rgba(244,63,94,0.25); background: rgba(244,63,94,0.02); border-radius: 12px; min-height: 125px;">
                 <div style="font-size: 0.65rem; color: #f43f5e; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Stop Loss Limit</div>
                 <div style="font-size: 1.55rem; font-weight: 700; color: #f43f5e; font-family: 'JetBrains Mono', monospace; margin: 8px 0;">
@@ -1580,11 +1587,11 @@ with tab1:
                 </div>
                 <div style="font-size: 0.68rem; color: #f43f5e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">−{risk_pct}% Tolerance</div>
             </div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
         with t1_col3:
             # Map risk_pct range (1-20) to reservoir visual height range (15% to 85%) for LiquidProgress
             risk_fill_percentage = min(max(int(risk_pct * 4.5), 15), 85)
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="rb-tiltedcard" style="padding: 12px 14px; border: 1.5px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.02); border-radius: 12px; min-height: 125px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                 <div style="flex: 1;">
                     <div style="font-size: 0.65rem; color: #10b981; font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Reward Target</div>
@@ -1602,7 +1609,7 @@ with tab1:
                     <div style="font-size: 0.52rem; color: #64748b; font-family: 'Space Grotesk', monospace; margin-top: 4px; font-weight:600;">RISK CLIP</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
         
         fig_t = go.Figure()
         ctx_df = df.tail(90)
@@ -1619,12 +1626,12 @@ with tab1:
         
         # Wrap Plotly Chart with TechCardDecorator corners (Component 15)
         st.markdown('<div class="chart-wrap" style="position: relative; overflow: visible;">', unsafe_allow_html=True)
-        st.markdown("""
+        st.markdown(clean_html("""
         <div class="rb-tech-bracket rb-bracket-tl" style="border-width: 2.5px 0 0 2.5px; border-color: #ffaa11;"></div>
         <div class="rb-tech-bracket rb-bracket-tr" style="border-width: 2.5px 2.5px 0 0; border-color: #ffaa11;"></div>
         <div class="rb-tech-bracket rb-bracket-bl" style="border-width: 0 0 2.5px 2.5px; border-color: #ffaa11;"></div>
         <div class="rb-tech-bracket rb-bracket-br" style="border-width: 0 2.5px 2.5px 0; border-color: #ffaa11;"></div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
         st.plotly_chart(fig_t, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1695,21 +1702,21 @@ with tab2:
         # Re-divide bottom row of Tab 2 to support a dynamic StackedCards scenario panel (Component 17)
         left_f, right_f = st.columns([2.5, 1], gap="large")
         with left_f:
-            st.markdown('<div class="chart-wrap" style="position: relative; overflow: visible;">', unsafe_allow_html=True)
-            st.markdown("""
+            st.markdown(clean_html('<div class="chart-wrap" style="position: relative; overflow: visible;">'), unsafe_allow_html=True)
+            st.markdown(clean_html("""
             <div class="rb-tech-bracket rb-bracket-tl" style="border-width: 2.5px 0 0 2.5px; border-color: #3b82f6;"></div>
             <div class="rb-tech-bracket rb-bracket-tr" style="border-width: 2.5px 2.5px 0 0; border-color: #3b82f6;"></div>
             <div class="rb-tech-bracket rb-bracket-bl" style="border-width: 0 0 2.5px 2.5px; border-color: #3b82f6;"></div>
             <div class="rb-tech-bracket rb-bracket-br" style="border-width: 0 2.5px 2.5px 0; border-color: #3b82f6;"></div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
             st.plotly_chart(fig_fc, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(clean_html('</div>'), unsafe_allow_html=True)
             
         with right_f:
-            st.markdown('<p class="section-header" style="margin-top:0;"><span class="rb-gradienttext">Projected Scenario Stack</span></p>', unsafe_allow_html=True)
+            st.markdown(clean_html('<p class="section-header" style="margin-top:0;"><span class="rb-gradienttext">Projected Scenario Stack</span></p>'), unsafe_allow_html=True)
             
             # StackedCards (Component 17) layout representing Bull, Median Expected, and Bear projections!
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="rb-spotlightcard" style="padding: 16px; min-height: 380px; position: relative; background: #0c101c !important;">
                 <!-- Component 4: Orb Light background glow behind scenario profiles stack -->
                 <div class="rb-orb-viewport" style="position: absolute; inset: 0; background: transparent; pointer-events: none; height: 100%; width: 100%;">
@@ -1745,7 +1752,7 @@ with tab2:
                     SCENARIO LAYER SEPARATION ACTIVE
                 </p>
             </div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  TAB 3 — TELEMETRY CONTROL MATRIX

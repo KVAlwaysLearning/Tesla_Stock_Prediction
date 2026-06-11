@@ -359,76 +359,91 @@ def _single_step_forecast(model, scaler, lookback_context: list) -> float:
 
 
 def _revise_prediction(
-    raw_pred:    float,
-    prev_price:  float,
-    regime:      dict,
-    step:        int,
-    total_steps: int,
+    raw_pred:       float,
+    prev_price:     float,
+    anchor_price:   float,   # price at step 0 (start of forecast horizon)
+    regime:         dict,
+    step:           int,
+    total_steps:    int,
 ) -> float:
     """
-    Revise a single CNN-GRU raw prediction using three complementary signals:
+    Revise a single CNN-GRU raw prediction.
 
-    1. Return normalisation
-       The model outputs a price level. We convert to an implied log-return,
-       then damp the return magnitude toward zero as steps increase — this
-       prevents compounding momentum from dragging the price in one direction
-       indefinitely over 60 steps.
+    Design
+    ──────
+    The previous version applied per-step return magnitude damping which
+    suppressed the CNN-GRU's natural step-to-step variation and caused the
+    flatline.  The correct approach is:
 
-    2. Hurst-based regime blending
-       H > 0.55 (trending)      → trust the CNN-GRU more, mild damping
-       H < 0.45 (mean-reverting) → pull toward the long-run EMA price strongly
-       H ≈ 0.50 (random walk)    → balanced blend
+    1. Trust the CNN-GRU's step-to-step return fully — this preserves the
+       natural ups and downs (daily variation) that the model learned.
 
-    3. Ornstein-Uhlenbeck mean-reversion pressure
-       A gentle continuous force pulling the price toward the long-run EMA,
-       proportional to (current_price - mean_price) * ou_speed.
-       This prevents the forecast from drifting to extreme levels over time.
+    2. Apply a CUMULATIVE drift correction only — if after `step` steps the
+       total log-return from anchor_price has grown beyond what is plausible
+       given historical volatility, nudge the excess back toward zero.
+       This prevents 60-step compounding without flattening individual steps.
+
+    3. Apply a light OU pull proportional to how far the current price has
+       drifted from the long-run EMA.  Scaled so it only activates when the
+       price is >10% away from the EMA.
+
+    4. Hurst weighting: in a trending market (H>0.55) apply less OU pull;
+       in a mean-reverting market (H<0.45) apply more.
+
+    5. Hard cap per step at ±4σ so single outlier predictions don't corrupt
+       the lookback window for subsequent steps.
     """
-    H          = regime["hurst"]
-    mean_price = regime["mean_price"]
-    ou_speed   = regime["ou_speed"]
-    vol        = regime["vol"]
+    H           = regime["hurst"]
+    mean_price  = regime["mean_price"]
+    ou_speed    = regime["ou_speed"]
+    vol         = regime["vol"]
 
-    if prev_price <= 0:
+    if prev_price <= 0 or anchor_price <= 0:
         return raw_pred
 
-    # ── 1. Raw implied log-return from CNN-GRU ────────────────────────────────
-    raw_log_ret = np.log(raw_pred / prev_price)
+    # ── 1. CNN-GRU raw step return — kept fully intact ────────────────────────
+    raw_log_ret = np.log(max(raw_pred, 1e-6) / max(prev_price, 1e-6))
 
-    # ── 2. Return magnitude damping (grows with step depth) ──────────────────
-    # At step 1: almost no damping.  At step 60: return is pulled ~70% toward 0.
-    # Formula: damped_ret = raw_ret * exp(-decay_rate * step)
-    # decay_rate calibrated so that at step=total_steps, attenuation ≈ 0.30
-    if total_steps > 1:
-        decay_rate = -np.log(0.30) / total_steps   # ≈ 0.020 for 60 steps
+    # ── 2. Cumulative drift correction ────────────────────────────────────────
+    # How far has the price drifted from anchor in total log-return terms?
+    cumulative_log_ret = np.log(max(prev_price, 1e-6) / max(anchor_price, 1e-6))
+
+    # Expected max absolute drift at this step depth: ±2σ√t (random-walk bound)
+    drift_budget = 2.0 * vol * np.sqrt(step)
+
+    # Correction: if cumulative drift exceeds budget, apply a restoring force
+    # proportional to the excess — NOT capping the step return, just nudging
+    drift_excess = abs(cumulative_log_ret) - drift_budget
+    if drift_excess > 0:
+        correction_sign     = -np.sign(cumulative_log_ret)   # oppose the drift
+        drift_correction    = correction_sign * drift_excess * 0.15  # gentle 15%
     else:
-        decay_rate = 0.0
-    damped_log_ret = raw_log_ret * np.exp(-decay_rate * step)
+        drift_correction = 0.0
 
-    # ── 3. Hurst-based trust weight for the CNN-GRU signal ───────────────────
-    # H > 0.55: trending — trust CNN-GRU direction more (weight up to 0.85)
-    # H < 0.45: mean-reverting — discount CNN-GRU direction (weight down to 0.35)
-    # Linear interpolation between those anchors
-    cnn_weight = float(np.interp(H, [0.35, 0.50, 0.65], [0.30, 0.60, 0.85]))
+    # ── 3. Hurst-scaled OU pull ────────────────────────────────────────────────
+    # Only apply when price is meaningfully away from EMA (>5% gap)
+    price_gap_pct = abs(prev_price - mean_price) / mean_price
+    if price_gap_pct > 0.05:
+        ou_pull = -ou_speed * np.log(max(prev_price, 1e-6) / max(mean_price, 1e-6))
+        # Hurst scaling: H=0.55 → ou_scale=0.10 (trending, weak pull)
+        #                H=0.50 → ou_scale=0.20
+        #                H=0.40 → ou_scale=0.35 (mean-reverting, strong pull)
+        ou_scale = float(np.interp(H, [0.35, 0.50, 0.65], [0.35, 0.20, 0.08]))
+    else:
+        ou_pull  = 0.0
+        ou_scale = 0.0
 
-    # ── 4. OU mean-reversion pull in log-return space ────────────────────────
-    # Pull = -κ * (log(prev_price) - log(mean_price))
-    # This is the discrete-time OU correction for one step
-    ou_pull = -ou_speed * np.log(prev_price / mean_price)
-    # Scale OU contribution by (1 - cnn_weight) so it fills the remaining trust
-    ou_weight = 1.0 - cnn_weight
+    # ── 4. Compose final log-return ───────────────────────────────────────────
+    # CNN-GRU drives the step; drift correction and OU are additive adjustments
+    final_log_ret = raw_log_ret + drift_correction + (ou_scale * ou_pull)
 
-    # ── 5. Blended log-return ─────────────────────────────────────────────────
-    blended_log_ret = (cnn_weight * damped_log_ret) + (ou_weight * ou_pull)
+    # Per-step hard cap at ±4σ — outlier guard only, not a routine constraint
+    final_log_ret = float(np.clip(final_log_ret, -4.0 * vol, 4.0 * vol))
 
-    # Hard cap: no single step can exceed ±3σ (≈ 3 * daily vol)
-    max_step_ret = 3.0 * vol
-    blended_log_ret = float(np.clip(blended_log_ret, -max_step_ret, max_step_ret))
+    revised_price = prev_price * np.exp(final_log_ret)
 
-    revised_price = prev_price * np.exp(blended_log_ret)
-
-    # Sanity floor/ceiling: revised price must stay within 60% – 240% of mean_price
-    revised_price = float(np.clip(revised_price, mean_price * 0.40, mean_price * 2.80))
+    # Absolute sanity bounds: price cannot fall below 20% or above 350% of EMA
+    revised_price = float(np.clip(revised_price, mean_price * 0.20, mean_price * 3.50))
     return revised_price
 
 
@@ -470,32 +485,35 @@ def dynamic_timeline_forecasting(
 
     # ── PATH A: start_date is within or at the database boundary ─────────────
     if target_start <= db_max_date:
+        # anchor = last real price before forecast steps begin
+        anchor_price_a = safe_float(df["Adj Close"].iloc[-1])
+        future_step    = 0
+
         for curr_date in biz_dates:
             if curr_date <= db_max_date:
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
                 pos_idx = max(pos_idx, 0)
                 preds_prices.append(float(df.iloc[pos_idx]["Adj Close"]))
             else:
+                future_step += 1
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
                 if pos_idx != -1 and pos_idx >= LOOKBACK:
                     history_slice = df.iloc[:pos_idx]
                 else:
                     history_slice = df.head(LOOKBACK)
 
-                # Build lookback window from real history + already-revised preds
                 lookback_context = history_slice.tail(LOOKBACK)["Adj Close"].tolist()
                 idx_offset = len(preds_prices) - 1
                 while len(lookback_context) < LOOKBACK and idx_offset >= 0:
                     lookback_context.insert(0, preds_prices[idx_offset])
                     idx_offset -= 1
 
-                raw_pred  = _single_step_forecast(model, scaler, lookback_context)
-                regime    = _compute_regime(history_slice.tail(252)["Adj Close"])
-                prev_p    = lookback_context[-1]
-                step_idx  = len([p for p in preds_prices if p not in
-                                  df["Adj Close"].values]) + 1
-                revised   = _revise_prediction(raw_pred, prev_p, regime,
-                                               step_idx, n_days)
+                raw_pred = _single_step_forecast(model, scaler, lookback_context)
+                regime   = _compute_regime(history_slice.tail(252)["Adj Close"])
+                prev_p   = lookback_context[-1]
+                revised  = _revise_prediction(
+                    raw_pred, prev_p, anchor_price_a, regime, future_step, n_days
+                )
                 preds_prices.append(revised)
 
     # ── PATH B: start_date is strictly beyond the database boundary ───────────
@@ -508,15 +526,17 @@ def dynamic_timeline_forecasting(
 
         # Bridge: fill gap between DB end and chosen start
         if len(gap_range) > 0:
-            regime_bridge = _compute_regime(working_df.tail(252)["Adj Close"])
-            total_bridge  = len(gap_range)
+            regime_bridge  = _compute_regime(working_df.tail(252)["Adj Close"])
+            anchor_bridge  = safe_float(working_df["Adj Close"].iloc[-1])
+            total_bridge   = len(gap_range)
 
             for b_step, g_date in enumerate(gap_range, start=1):
                 seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
                 raw_pred  = _single_step_forecast(model, scaler, seed_vals)
                 prev_p    = seed_vals[-1]
-                revised   = _revise_prediction(raw_pred, prev_p, regime_bridge,
-                                               b_step, total_bridge)
+                revised   = _revise_prediction(
+                    raw_pred, prev_p, anchor_bridge, regime_bridge, b_step, total_bridge
+                )
 
                 working_df.loc[g_date, "Adj Close"] = revised
                 bridge_dates.append(g_date)
@@ -528,12 +548,14 @@ def dynamic_timeline_forecasting(
 
         # Target horizon: regime computed on full history including bridge
         regime_target = _compute_regime(working_df.tail(252)["Adj Close"])
+        anchor_target = safe_float(working_df["Adj Close"].iloc[-1])
         for t_step, b_date in enumerate(biz_dates, start=1):
             seed_vals = working_df.tail(LOOKBACK)["Adj Close"].tolist()
             raw_pred  = _single_step_forecast(model, scaler, seed_vals)
             prev_p    = seed_vals[-1]
-            revised   = _revise_prediction(raw_pred, prev_p, regime_target,
-                                           t_step, n_days)
+            revised   = _revise_prediction(
+                raw_pred, prev_p, anchor_target, regime_target, t_step, n_days
+            )
             preds_prices.append(revised)
             working_df.loc[b_date, "Adj Close"] = revised
 

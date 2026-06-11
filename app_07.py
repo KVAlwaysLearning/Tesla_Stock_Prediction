@@ -60,46 +60,49 @@ st.markdown("""
 *, *::before, *::after { box-sizing: border-box; }
 
 /* ═══════════════════════════════════════════════
-   AURORA BACKGROUND WAVE (reactbits: Aurora)
-   Slow-orbiting dual plasma blobs with fluid opacity
+   LIQUID ETHER BACKGROUND (reactbits: LiquidEther)
+   Dynamic swirling, morphing fluid mesh of ether gradients
 ═══════════════════════════════════════════════ */
-@keyframes aurora-drift-a {
-  0%   { transform: translate(0%,   0%)   scale(1);    opacity: 0.60; }
-  33%  { transform: translate(12%,  -15%)  scale(1.22); opacity: 0.40; }
-  66%  { transform: translate(-10%,  12%)  scale(0.90); opacity: 0.70; }
-  100% { transform: translate(0%,   0%)   scale(1);    opacity: 0.60; }
+@keyframes rb-liquid-ether-a {
+  0%   { background-position: 0% 0%; transform: scale(1) rotate(0deg); }
+  50%  { background-position: 50% 100%; transform: scale(1.15) rotate(180deg); }
+  100% { background-position: 100% 0%; transform: scale(1) rotate(360deg); }
 }
-@keyframes aurora-drift-b {
-  0%   { transform: translate(0%,  0%)   scale(1);    opacity: 0.45; }
-  40%  { transform: translate(-12%, 18%)  scale(1.15); opacity: 0.55; }
-  75%  { transform: translate(10%, -10%)   scale(0.95); opacity: 0.30; }
-  100% { transform: translate(0%,  0%)   scale(1);    opacity: 0.45; }
+@keyframes rb-liquid-ether-b {
+  0%   { background-position: 100% 100%; transform: scale(1.2) rotate(360deg); }
+  50%  { background-position: 0% 50%; transform: scale(0.9) rotate(180deg); }
+  100% { background-position: 100% 100%; transform: scale(1.2) rotate(0deg); }
 }
 
 .stApp {
-  background-color: #06080e !important;
+  background-color: #03050a !important;
   color: #e2e8f5 !important;
   font-family: 'Inter', sans-serif !important;
   overflow-x: hidden;
 }
 
-/* Beautiful fluid mesh behind all UI layers */
 .stApp::before {
   content: "";
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse 75% 60% at 10% 25%, rgba(65,105,225,0.16) 0%, transparent 65%),
-    radial-gradient(ellipse 65% 75% at 90% 70%, rgba(147,51,234,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 45%, rgba(245,158,11,0.05) 0%, transparent 55%);
-  animation: aurora-drift-a 22s ease-in-out infinite;
+  position: fixed; inset: -50%; z-index: 0; pointer-events: none;
+  background: 
+    radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 40%, rgba(168, 85, 247, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(244, 63, 94, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse at 90% 10%, rgba(255, 204, 0, 0.08) 0%, transparent 40%);
+  filter: blur(80px) contrast(1.15);
+  animation: rb-liquid-ether-a 35s ease-in-out infinite alternate;
 }
 .stApp::after {
   content: "";
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse 65% 50% at 80% 15%, rgba(16,185,129,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 55% 65% at 20% 80%, rgba(59,130,246,0.10) 0%, transparent 55%);
-  animation: aurora-drift-b 28s ease-in-out infinite;
+  position: fixed; inset: -50%; z-index: 0; pointer-events: none;
+  background: 
+    radial-gradient(ellipse at 70% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 10% 50%, rgba(16, 185, 129, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 30%, rgba(236, 72, 153, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 90%, rgba(255, 204, 0, 0.06) 0%, transparent 40%);
+  filter: blur(100px) contrast(1.2);
+  animation: rb-liquid-ether-b 42s ease-in-out infinite alternate;
+  mix-blend-mode: color-dodge;
 }
 
 /* Futuristic Fine Dots Pattern Overlay (reactbits: DotGrid) */
@@ -701,18 +704,38 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
 
 /* 20. STACKEDCARDS */
 .rb-stack-container {
-  position: relative; height: 140px; width: 100%;
+  position: relative; height: 140px; width: 100%; transition: height 0.4s ease;
 }
 .rb-stack-card {
   position: absolute; width: 90%; left: 5%; height: 80px; border-radius: 10px; padding: 12px;
-  background: #0b0e17; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s ease;
+  background: #0b0e17; border: 1px solid rgba(255,255,255,0.06); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .rb-stack-c1 { top: 0px; z-index: 3; transform: scale(1); }
 .rb-stack-c2 { top: 15px; z-index: 2; transform: scale(0.94); opacity: 0.75; }
 .rb-stack-c3 { top: 30px; z-index: 1; transform: scale(0.88); opacity: 0.45; }
-.rb-stack-container:hover .rb-stack-c1 { transform: translateY(-5px); }
-.rb-stack-container:hover .rb-stack-c2 { transform: translateY(5px) scale(0.95); opacity: 0.88; }
-.rb-stack-container:hover .rb-stack-c3 { transform: translateY(15px) scale(0.90); opacity: 0.65; }
+
+/* Elegant downward separating fan out to make all cards 100% readable */
+.rb-stack-container:hover {
+  height: 290px !important;
+}
+.rb-stack-container:hover .rb-stack-c1 {
+  transform: translateY(0px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 10 !important;
+  box-shadow: 0 8px 24px rgba(255,204,0,0.15) !important;
+}
+.rb-stack-container:hover .rb-stack-c2 {
+  transform: translateY(90px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 9 !important;
+  box-shadow: 0 8px 24px rgba(59,130,246,0.12) !important;
+}
+.rb-stack-container:hover .rb-stack-c3 {
+  transform: translateY(180px) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 8 !important;
+  box-shadow: 0 8px 24px rgba(244,63,94,0.12) !important;
+}
 
 /* 21. LIQUIDPROGRESS */
 .rb-liquid-ball {
@@ -941,18 +964,42 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
   background: rgba(255,204,0,0.45) !important;
 }
 
+@keyframes rb-border-glow-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .flying-poster-card {
   flex: 0 0 450px !important;
   min-width: 450px !important;
-  background: rgba(12,16,28,0.70) !important;
-  border: 1.5px solid rgba(59,130,246,0.18) !important;
+  background: rgba(10,13,22,0.85) !important;
   border-radius: 14px !important;
   padding: 18px !important;
   box-shadow: 0 12px 34px rgba(0,0,0,0.55) !important;
-  transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
   transform-style: preserve-3d;
   will-change: transform;
   position: relative !important;
+  overflow: visible !important;
+}
+
+/* Beautiful ReactBits-inspired Border Glow */
+.flying-poster-card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: -1.5px !important;
+  border-radius: 15px !important;
+  padding: 1.5px !important;
+  background: linear-gradient(135deg, #3b82f6, #a855f7, #ffcc00, #3b82f6) !important;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask-composite: exclude !important;
+  background-size: 200% auto !important;
+  animation: rb-border-glow-rotate 5s linear infinite !important;
+  pointer-events: none !important;
+  opacity: 0.38 !important;
+  transition: opacity 0.4s ease, inset 0.4s ease, padding 0.4s ease !important;
 }
 
 .flying-poster-card:nth-child(3n+1) {
@@ -967,10 +1014,15 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
 
 .flying-poster-card:hover {
   transform: translateY(-14px) rotateY(4.5deg) scale(1.025) !important;
-  border-color: rgba(255,204,0,0.42) !important;
   box-shadow: 0 24px 44px rgba(59,130,246,0.22) !important;
   z-index: 99 !important;
   animation-play-state: paused !important;
+}
+.flying-poster-card:hover::before {
+  opacity: 1.0 !important;
+  inset: -2.5px !important;
+  padding: 2.5px !important;
+  border-radius: 16px !important;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1987,7 +2039,7 @@ with tab2:
                     Hover cursor over primary stack layers below to expand and separate scenario model values:
                 </p>
                 
-                <div class="rb-stack-container" style="height: 220px; margin-top: 10px;">
+                <div class="rb-stack-container" style="margin-top: 10px;">
                     <!-- Component 17 Stack Card 3: Bear Case (Red border) -->
                     <div class="rb-stack-card rb-stack-c3" style="border: 1px solid rgba(244,63,94,0.35); background: #0c080d; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
                         <span style="font-family: 'Space Grotesk', sans-serif; font-size: 0.62rem; color: #f43f5e; font-weight: 700; letter-spacing: 0.08em;">CASE 03: BEAR FLOOR</span>
@@ -2071,24 +2123,24 @@ with tab3:
     for c, col_color in [("MA30", BLUE), ("MA90", PURPLE)]:
         if c in dv.columns and dv[c].notna().any():
             fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
-    fig1.update_layout(**base_layout(380, "Continuous Close Pricing Sequence"))
+    fig1.update_layout(**base_layout(480, ""))
 
     # Fig 2: Segmented Bar Volume Distribution
     v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
     fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Stream"))
-    fig2.update_layout(**base_layout(380, "Segmented Bar Volume Distribution"))
+    fig2.update_layout(**base_layout(480, ""))
 
     # Fig 3: Holographic Structural Candlestick Envelope
     fig3 = go.Figure(go.Candlestick(x=dv.index, open=dv["Open"], high=dv["High"], low=dv["Low"], close=dv["Close"], increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Candlestick"))
     if dv["BB_Upper"].notna().any():
         fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="Volatility Cell Upper", line=dict(color=MUTED, width=0.8, dash="dash")))
         fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(100,116,139,0.02)", name="Volatility Cell Lower", line=dict(color=MUTED, width=0.8, dash="dash")))
-    fig3.update_layout(**base_layout(380, "Holographic Structural Candlestick Envelope"))
+    fig3.update_layout(**base_layout(480, ""))
     fig3.update_layout(xaxis_rangeslider_visible=False)
 
     # Fig 4: Intraday Dispersion Bounds
     fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(255,204,0,0.06)", line=dict(color=ACCENT, width=1.0)))
-    fig4.update_layout(**base_layout(380, "Intraday Dispersion Bounds (High - Low Variance)"))
+    fig4.update_layout(**base_layout(480, ""))
 
     # Fig 5: Momentum Convergence/Divergence Oscillator (MACD)
     fig5 = None
@@ -2098,7 +2150,7 @@ with tab3:
         fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="MACD Signal", line=dict(color=ACCENT, width=1.2)), row=1, col=1)
         h_colors = [GREEN if val >= 0 else RED for val in dv["MACDHist"].fillna(0)]
         fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram Matrix", marker_color=h_colors), row=2, col=1)
-        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=380, margin=dict(l=40,r=20,t=30,b=20), title=dict(text="Momentum Convergence (12, 26, 9)", font=dict(size=11, color=MUTED, family="Space Grotesk")), showlegend=False)
+        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=480, margin=dict(l=40,r=20,t=10,b=20), showlegend=False)
         fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
 
     # Fig 6: RSI Engine
@@ -2110,12 +2162,12 @@ with tab3:
         fig6.add_hrect(y0=0,  y1=30,  fillcolor="rgba(16,185,129,0.03)", line_width=0)
         fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
         fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
-        fig6.update_layout(**base_layout(380, "Relative Strength Velocity Zone RSI (14)", override_yaxis=dict(range=[0, 100])))
+        fig6.update_layout(**base_layout(480, "", override_yaxis=dict(range=[0, 100])))
 
     # Fig 7: Macro Annualized Core Price Assets
     yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
     fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
-    fig7.update_layout(**base_layout(380, "Macro Annualized Core Price Assets"))
+    fig7.update_layout(**base_layout(480, ""))
 
     # Fig 8: Seasonality Distribution
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -2123,7 +2175,7 @@ with tab3:
     for m_idx, m_name in enumerate(months, 1):
         sub = dv[dv.index.month == m_idx]["Close"].dropna()
         if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.12)"))
-    fig8.update_layout(**base_layout(380, "Seasonality Structural Distribution Matrices"), showlegend=False)
+    fig8.update_layout(**base_layout(480, ""), showlegend=False)
 
     # Fig 11: Correlation matrix
     fig11 = None
@@ -2132,56 +2184,65 @@ with tab3:
     if len(corr_data) >= 5 and len(corr_cols) >= 2:
         c_mat = corr_data.corr().round(3)
         fig11 = go.Figure(go.Heatmap(z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1, text=c_mat.values, texttemplate="%{text:.2f}", showscale=True))
-        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=380, margin=dict(l=40, r=20, t=10, b=40))
+        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=480, margin=dict(l=40, r=20, t=10, b=40))
 
     # Output the dynamic horizontal scroll sequence frame (Flying Posters - reactbits)
     st.markdown('<div class="flying-posters-viewport">', unsafe_allow_html=True)
 
     # Poster 1
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🛰️ CONTINUOUS CLOSE PRICING SEQUENCE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 2
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📊 SEGMENTED BAR VOLUME DISTRIBUTION</div>', unsafe_allow_html=True)
     st.plotly_chart(fig2, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 3
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🕯️ HOLOGRAPHIC CANDLESTICK ENVELOPE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 4
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📈 INTRADAY DISPERSION BOUNDS VARIANCE</div>', unsafe_allow_html=True)
     st.plotly_chart(fig4, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 5
     if fig5 is not None:
         st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📉 MOMENTUM CONVERGENCE CONTOUR</div>', unsafe_allow_html=True)
         st.plotly_chart(fig5, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 6
     if fig6 is not None:
         st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📶 STRENGTH VELOCITY RSI OSCILLATOR</div>', unsafe_allow_html=True)
         st.plotly_chart(fig6, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 7
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">📅 MACRO ANNUALIZED PRICE ASSETS</div>', unsafe_allow_html=True)
     st.plotly_chart(fig7, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 8
     st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">❄️ SEASONALITY DISTRIBUTION MATRICES</div>', unsafe_allow_html=True)
     st.plotly_chart(fig8, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Poster 9
     if fig11 is not None:
         st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+        st.markdown('<div style="font-family: \'Space Grotesk\', sans-serif; font-size: 0.82rem; font-weight: 700; color: #ffcc00; margin-bottom: 12px; border-bottom: 1.5px solid rgba(255,204,0,0.18); padding-bottom: 6px; letter-spacing: 0.05em; text-align: center;">🧬 ATTRIBUTE CORRELATION MATRIX</div>', unsafe_allow_html=True)
         st.plotly_chart(fig11, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 

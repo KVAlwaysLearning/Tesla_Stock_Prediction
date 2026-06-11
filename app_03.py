@@ -265,10 +265,6 @@ def load_model_cached(file_id: str):
     return model
 
 def extract_additive_components(history_series: pd.Series, target_dates: pd.DatetimeIndex) -> np.ndarray:
-    """
-    Decomposes history with Prophet (to extract macro seasonality patterns) 
-    and captures localized error/autoregressive adjustments via SARIMAX.
-    """
     try:
         from prophet import Prophet
         from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -278,7 +274,6 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
     if len(target_dates) == 0 or len(history_series) < 30:
         return np.zeros(len(target_dates))
 
-    # 1. Prophet Layer
     pdf = history_series.reset_index()
     pdf.columns = ["ds", "y"]
     m_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
@@ -287,7 +282,6 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
     forecast_prophet = m_prophet.predict(future)
     prophet_pattern = forecast_prophet["yhat"].values - history_series.iloc[-1]
 
-    # 2. SARIMAX Layer
     try:
         sarimax_mod = SARIMAX(history_series.values, order=(1,1,1), seasonal_order=(1,0,0,5))
         s_res = sarimax_mod.fit(disp=False)
@@ -299,10 +293,6 @@ def extract_additive_components(history_series: pd.Series, target_dates: pd.Date
 
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
-    """
-    Production-Grade Additive Structural Matrix. 
-    Uses positional iloc lookups via binary search get_indexer to avoid weekend/holiday layout KeyError faults.
-    """
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
     biz_dates = pd.bdate_range(start=target_start, periods=n_days)
@@ -313,17 +303,14 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     preds_prices = []
     bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
     
-    # ─── SCENARIO 1: TARGET BOUNDARY LIES INSIDE HISTORICAL RECORD MARKERS ───
     if target_start <= db_max_date:
         for curr_date in biz_dates:
             if curr_date <= db_max_date:
-                # Absolute Ground Truth Override using nearest matching positional anchor
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
                 if pos_idx == -1: 
                     pos_idx = 0
                 preds_prices.append(float(df.iloc[pos_idx]["Adj Close"]))
             else:
-                # Dynamic Rolling Loop Context Window Mapping
                 pos_idx = df.index.get_indexer([curr_date], method="pad")[0]
                 if pos_idx != -1 and pos_idx >= LOOKBACK:
                     history_slice = df.iloc[:pos_idx]
@@ -346,7 +333,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
                 raw_pred = float(scaler.inverse_transform([[np.clip(model.predict(x_input, verbose=0)[0, 0], 0.0, 1.0)]])[0,0])
                 preds_prices.append(raw_pred + (additive_structural_delta * 0.75))
 
-    # ─── SCENARIO 2: TARGET BOUNDARY LIES OUTSIDE HISTORICAL BOUNDS (Bridge Layer Enabled) ───
     else:
         working_df = df[["Adj Close"]].copy()
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
@@ -409,7 +395,7 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║                    LOAD INITIALIZER                      ║
-# ╚══════════════════════════════════════════════════════════╗
+# ╚══════════════════════════════════════════════════════════╝
 
 with st.spinner("Loading TSLA data…"):
     df, data_warnings = load_data()
@@ -498,7 +484,7 @@ f_dates, f_prices, f_lower, f_upper = None, None, None, None
 b_dates, b_prices, b_lower, b_upper = None, None, None, None
 
 if model is not None and scaler_ok:
-    with st.spinner("Executing Double-Engine Structural Matrix (Prophet + SARIMAX Alignment)..."):
+    with st.spinner("Executing Double-Engine Structural Matrix..."):
         try:
             f_dates, f_prices, f_lower, f_upper, b_dates, b_prices, b_lower, b_upper = dynamic_timeline_forecasting(
                 model, scaler, df, pd.Timestamp(chosen_start_date), n_days=forecast_days
@@ -595,7 +581,7 @@ with tab1:
         st.plotly_chart(fig_t, width='stretch')
 
 # ════════════════════════════════════════════════════════════
-#  TAB 2 — FORECAST ENGINE
+#  TAB 2 — FORECAST ENGINE (GAP-FREE CONTEXT WITH FIXED VIEW RANGE)
 # ════════════════════════════════════════════════════════════
 with tab2:
     if model is None:
@@ -615,7 +601,9 @@ with tab2:
         c4.markdown(metric_card("Horizon Floor Trough", f"${safe_float(f_prices.min()):.2f}"), unsafe_allow_html=True)
 
         fig_fc = go.Figure()
-        fig_fc.add_trace(go.Scatter(x=df.index[-90:], y=df["Adj Close"].tail(90), name="Database Historical Core", line=dict(color=ACCENT, width=2)))
+        
+        # CHANGED: We now feed the ENTIRE historical dataframe series so there is no gap when zooming back/out
+        fig_fc.add_trace(go.Scatter(x=df.index, y=df["Adj Close"], name="Database Historical Core", line=dict(color=ACCENT, width=2)))
         
         if b_dates is not None and len(b_dates) > 0:
             b_x = list(b_dates) + list(b_dates[::-1])
@@ -628,7 +616,17 @@ with tab2:
         fig_fc.add_trace(go.Scatter(x=fx, y=fy, fill="toself", fillcolor="rgba(91,141,238,0.12)", line=dict(color="rgba(0,0,0,0)"), name="Forecast Confidence Variance"))
         fig_fc.add_trace(go.Scatter(x=f_dates, y=f_prices, name="Target Horizon Output (Hybrid Model)", line=dict(color=BLUE, width=2.2, dash="dot"), mode="lines+markers"))
         
-        fig_fc.update_layout(**base_layout(440, "Dynamic Continuity Multi-Step Simulation Chart Core", override_yaxis=dict(tickprefix="$")))
+        # CHANGED: Calculate exact 2-month viewport padding parameters before and after the horizon timeline targets
+        view_start = pd.Timestamp(chosen_start_date) - pd.DateOffset(months=2)
+        view_end = pd.Timestamp(f_dates[-1]) + pd.DateOffset(months=2)
+        
+        # Formulate base layout dictionary parameters
+        base_ly_params = base_layout(440, "Dynamic Continuity Multi-Step Simulation Chart Core", override_yaxis=dict(tickprefix="$"))
+        
+        # Force default initial viewing window scope restrictions on the X-Axis timeline scale boundary parameters
+        base_ly_params["xaxis"].update(dict(range=[view_start, view_end]))
+        
+        fig_fc.update_layout(**base_ly_params)
         st.plotly_chart(fig_fc, width='stretch')
 
 # ════════════════════════════════════════════════════════════

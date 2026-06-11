@@ -21,12 +21,13 @@ def clean_html(html_code: str) -> str:
         return ""
     return "\n".join(line.strip() for line in html_code.splitlines())
 
-_original_markdown = st.markdown
-def safe_markdown(body, *args, **kwargs):
+import streamlit.delta_generator
+_original_dg_markdown = streamlit.delta_generator.DeltaGenerator.markdown
+def safe_dg_markdown(self, body, *args, **kwargs):
     if isinstance(body, str) and body.strip().startswith("<"):
         body = clean_html(body)
-    return _original_markdown(body, *args, **kwargs)
-st.markdown = safe_markdown
+    return _original_dg_markdown(self, body, *args, **kwargs)
+streamlit.delta_generator.DeltaGenerator.markdown = safe_dg_markdown
 
 warnings.filterwarnings("ignore")
 
@@ -789,6 +790,188 @@ hr { border-color: rgba(59,130,246,0.12) !important; }
   background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
   background-size: 100% 4px, 6px 100%; border-radius: 8px;
 }
+
+/* ═══════════════════════════════════════════════
+   28. STAGGERED MENU (reactbits: StaggeredMenu)
+═══════════════════════════════════════════════ */
+.rb-menu-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+}
+.rb-menu-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between !important;
+  width: 100%;
+  padding: 14px 18px !important;
+  background: rgba(59,130,246,0.06) !important;
+  border: 1.5px solid rgba(59,130,246,0.22) !important;
+  border-radius: 10px !important;
+  color: #ffcc00 !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.08em !important;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none;
+}
+.rb-menu-toggle:hover {
+  background: rgba(59,130,246,0.12) !important;
+  border-color: #ffaa11 !important;
+  box-shadow: 0 0 20px rgba(255,204,0,0.18) !important;
+}
+.rb-menu-dropdown {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+  perspective: 1000px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.rb-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px 16px !important;
+  background: rgba(12,16,28,0.85) !important;
+  border: 1px solid rgba(59,130,246,0.12) !important;
+  border-radius: 8px !important;
+  color: #a1b0cb !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform-style: preserve-3d;
+  opacity: 0;
+  transform: rotateX(-15deg) translateY(-10px);
+  animation: rb-stagger-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+.rb-menu-item:hover {
+  background: rgba(255,204,0,0.06) !important;
+  border-color: #ffcc00 !important;
+  color: #ffffff !important;
+  transform: scale(1.02) translateZ(15px) !important;
+}
+.rb-menu-item-icon {
+  color: #ffcc00 !important;
+  font-size: 0.95rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+@keyframes rb-stagger-in {
+  to {
+    opacity: 1;
+    transform: rotateX(0) translateY(0);
+  }
+}
+.rb-menu-item:nth-child(1) { animation-delay: 0.08s !important; }
+.rb-menu-item:nth-child(2) { animation-delay: 0.16s !important; }
+.rb-menu-item:nth-child(3) { animation-delay: 0.24s !important; }
+.rb-menu-item:nth-child(4) { animation-delay: 0.32s !important; }
+.rb-menu-item:nth-child(5) { animation-delay: 0.40s !important; }
+
+/* Checkbox hack to toggle the menu smoothly without rerun */
+#rb-menu-toggle-chk:checked ~ .rb-menu-dropdown {
+  display: flex !important;
+}
+#rb-menu-toggle-chk:not(:checked) ~ .rb-menu-dropdown {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  margin-top: 0 !important;
+  pointer-events: none !important;
+}
+#rb-menu-toggle-chk:checked ~ .rb-menu-dropdown {
+  max-height: 500px !important;
+  opacity: 1 !important;
+}
+#rb-menu-toggle-chk:checked ~ .rb-menu-toggle .rb-menu-arrow {
+  transform: rotate(180deg) !important;
+}
+.rb-menu-arrow {
+  transition: transform 0.3s ease !important;
+}
+
+/* ═══════════════════════════════════════════════
+   29. FLYING POSTERS (reactbits: FlyingPosters)
+═══════════════════════════════════════════════ */
+@keyframes rb-poster-float-1 {
+  0%, 100% { transform: translateY(0px) rotate(0.6deg); }
+  50%      { transform: translateY(-7px) rotate(-0.6deg); }
+}
+@keyframes rb-poster-float-2 {
+  0%, 100% { transform: translateY(-6px) rotate(-0.8deg); }
+  50%      { transform: translateY(4px) rotate(0.8deg); }
+}
+@keyframes rb-poster-float-3 {
+  0%, 100% { transform: translateY(3px) rotate(0.5deg); }
+  50%      { transform: translateY(-5px) rotate(-0.5deg); }
+}
+
+.flying-posters-viewport {
+  display: flex !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  gap: 28px !important;
+  padding: 16px 14px 28px 14px !important;
+  scroll-behavior: smooth !important;
+  perspective: 1200px;
+  -webkit-overflow-scrolling: touch !important;
+  width: 100% !important;
+}
+/* Cyberpunk thin custom scrollbar for the dynamic flying posters gallery */
+.flying-posters-viewport::-webkit-scrollbar {
+  height: 6px !important;
+}
+.flying-posters-viewport::-webkit-scrollbar-track {
+  background: rgba(12,16,28,0.25) !important;
+  border-radius: 10px !important;
+}
+.flying-posters-viewport::-webkit-scrollbar-thumb {
+  background: rgba(59,130,246,0.22) !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(59,130,246,0.15) !important;
+}
+.flying-posters-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,204,0,0.45) !important;
+}
+
+.flying-poster-card {
+  flex: 0 0 450px !important;
+  min-width: 450px !important;
+  background: rgba(12,16,28,0.70) !important;
+  border: 1.5px solid rgba(59,130,246,0.18) !important;
+  border-radius: 14px !important;
+  padding: 18px !important;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.55) !important;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform-style: preserve-3d;
+  will-change: transform;
+  position: relative !important;
+}
+
+.flying-poster-card:nth-child(3n+1) {
+  animation: rb-poster-float-1 6.5s ease-in-out infinite !important;
+}
+.flying-poster-card:nth-child(3n+2) {
+  animation: rb-poster-float-2 7.5s ease-in-out infinite !important;
+}
+.flying-poster-card:nth-child(3n) {
+  animation: rb-poster-float-3 5.8s ease-in-out infinite !important;
+}
+
+.flying-poster-card:hover {
+  transform: translateY(-14px) rotateY(4.5deg) scale(1.025) !important;
+  border-color: rgba(255,204,0,0.42) !important;
+  box-shadow: 0 24px 44px rgba(59,130,246,0.22) !important;
+  z-index: 99 !important;
+  animation-play-state: paused !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1266,6 +1449,39 @@ with st.sidebar:
     st.markdown("## <span class='rb-shinytext' style='font-family: \"Space Grotesk\", sans-serif; font-size:1.6rem; font-weight:700;'>⚡ TSLA TRANSCEIVER</span>", unsafe_allow_html=True)
     st.markdown("---")
 
+    # Beautiful interactive ReactBits StaggeredMenu integration
+    st.markdown("""
+    <div class="rb-menu-container">
+        <input type="checkbox" id="rb-menu-toggle-chk" style="display:none;" checked />
+        <label for="rb-menu-toggle-chk" class="rb-menu-toggle">
+            <span>🌐 NETWORK HUB DIRECTORY</span>
+            <span class="rb-menu-arrow">▼</span>
+        </label>
+        <div class="rb-menu-dropdown">
+            <div class="rb-menu-item">
+                <span class="rb-menu-item-icon">🛰️</span>
+                <span>Real-Time Core Telemetry</span>
+            </div>
+            <div class="rb-menu-item">
+                <span class="rb-menu-item-icon">🔮</span>
+                <span>Hybrid Forecast Engine</span>
+            </div>
+            <div class="rb-menu-item">
+                <span class="rb-menu-item-icon">📶</span>
+                <span>Oscillator Velocity Metrics</span>
+            </div>
+            <div class="rb-menu-item">
+                <span class="rb-menu-item-icon">🎛️</span>
+                <span>Transceiver Calibration Target</span>
+            </div>
+            <div class="rb-menu-item">
+                <span class="rb-menu-item-icon">🛡️</span>
+                <span>Alpha Risk Stabilization Matrix</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     # GradientText + Noise (Component 7 / 3) + 3D TiltedCard (Component 13)
     st.markdown('<p class="section-header"><span class="rb-gradienttext">Model Engine Control</span></p>', unsafe_allow_html=True)
     
@@ -1705,6 +1921,15 @@ with tab2:
         base_ly_params["xaxis"].update(dict(range=[view_start, view_end]))
 
         fig_fc.update_layout(**base_ly_params)
+        fig_fc.update_layout(
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.18,
+                xanchor="center",
+                x=0.5
+            )
+        )
 
         # Re-divide bottom row of Tab 2 to support a dynamic StackedCards scenario panel (Component 17)
         left_f, right_f = st.columns([2.5, 1], gap="large")
@@ -1811,103 +2036,128 @@ with tab3:
 
     dv = df_vis.loc[str(viz_start):str(viz_end)].copy()
 
-    r1a, r1b = st.columns([3, 2])
-    with r1a:
-        fig1 = go.Figure()
-        fig1.add_trace(go.Scatter(x=dv.index, y=dv["Close"], name="Unified Close Connection", line=dict(color=ACCENT, width=1.5)))
-        for c, col_color in [("MA30", BLUE), ("MA90", PURPLE)]:
-            if c in dv.columns and dv[c].notna().any():
-                fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
-        fig1.update_layout(**base_layout(300, "Continuous Close Pricing Sequence"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig1, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with r1b:
-        v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
-        fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Stream"))
-        fig2.update_layout(**base_layout(300, "Segmented Bar Volume Distribution"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig2, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Calculate figures inside the local frame buffer
+    # Fig 1: Continuous Close Pricing Sequence
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=dv.index, y=dv["Close"], name="Unified Close Connection", line=dict(color=ACCENT, width=1.5)))
+    for c, col_color in [("MA30", BLUE), ("MA90", PURPLE)]:
+        if c in dv.columns and dv[c].notna().any():
+            fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
+    fig1.update_layout(**base_layout(240, "Continuous Close Pricing Sequence"))
 
-    r2a, r2b = st.columns([3, 2])
-    with r2a:
-        fig3 = go.Figure(go.Candlestick(x=dv.index, open=dv["Open"], high=dv["High"], low=dv["Low"], close=dv["Close"], increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Candlestick"))
-        if dv["BB_Upper"].notna().any():
-            fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="Volatility Cell Upper", line=dict(color=MUTED, width=0.8, dash="dash")))
-            fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(100,116,139,0.02)", name="Volatility Cell Lower", line=dict(color=MUTED, width=0.8, dash="dash")))
-        fig3.update_layout(**base_layout(300, "Holographic Structural Candlestick Envelope"))
-        fig3.update_layout(xaxis_rangeslider_visible=False)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig3, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with r2b:
-        fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(255,204,0,0.06)", line=dict(color=ACCENT, width=1.0)))
-        fig4.update_layout(**base_layout(300, "Intraday Dispersion Bounds (High - Low Variance)"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig4, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Fig 2: Segmented Bar Volume Distribution
+    v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
+    fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Stream"))
+    fig2.update_layout(**base_layout(240, "Segmented Bar Volume Distribution"))
 
-    r3a, r3b = st.columns(2)
-    with r3a:
-        if dv["MACD"].notna().any():
-            fig5 = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.6, 0.4], vertical_spacing=0.05)
-            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACD"], name="MACD Vector", line=dict(color=BLUE, width=1.2)), row=1, col=1)
-            fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="MACD Signal", line=dict(color=ACCENT, width=1.2)), row=1, col=1)
-            h_colors = [GREEN if val >= 0 else RED for val in dv["MACDHist"].fillna(0)]
-            fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram Matrix", marker_color=h_colors), row=2, col=1)
-            fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=300, margin=dict(l=40,r=20,t=30,b=20), title=dict(text="Momentum Convergence/Divergence Oscillator (12, 26, 9)", font=dict(size=11, color=MUTED, family="Space Grotesk")), showlegend=False)
-            fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
-            st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-            st.plotly_chart(fig5, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        else: empty_state("📉", "Initializing oscillator datasets...")
-    with r3b:
-        if dv["RSI"].notna().any():
-            fig6 = go.Figure()
-            fig6.add_trace(go.Scatter(x=dv.index, y=dv["RSI"], name="RSI Engine", line=dict(color=PURPLE, width=1.2)))
-            fig6.add_hrect(y0=70, y1=100, fillcolor="rgba(244,63,94,0.03)", line_width=0)
-            fig6.add_hrect(y0=0,  y1=30,  fillcolor="rgba(16,185,129,0.03)", line_width=0)
-            fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
-            fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
-            fig6.update_layout(**base_layout(300, "Relative Strength Velocity Zone RSI (14)", override_yaxis=dict(range=[0, 100])))
-            st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-            st.plotly_chart(fig6, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        else: empty_state("📉", "Initializing velocity datasets...")
+    # Fig 3: Holographic Structural Candlestick Envelope
+    fig3 = go.Figure(go.Candlestick(x=dv.index, open=dv["Open"], high=dv["High"], low=dv["Low"], close=dv["Close"], increasing_line_color=GREEN, decreasing_line_color=RED, name="OHLC Candlestick"))
+    if dv["BB_Upper"].notna().any():
+        fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Upper"], name="Volatility Cell Upper", line=dict(color=MUTED, width=0.8, dash="dash")))
+        fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(100,116,139,0.02)", name="Volatility Cell Lower", line=dict(color=MUTED, width=0.8, dash="dash")))
+    fig3.update_layout(**base_layout(240, "Holographic Structural Candlestick Envelope"))
+    fig3.update_layout(xaxis_rangeslider_visible=False)
 
-    r4a, r4b = st.columns(2)
-    with r4a:
-        yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
-        fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
-        fig7.update_layout(**base_layout(300, "Macro Annualized Core Price Assets"))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig7, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with r4b:
-        months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-        fig8 = go.Figure()
-        for m_idx, m_name in enumerate(months, 1):
-            sub = dv[dv.index.month == m_idx]["Close"].dropna()
-            if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.12)"))
-        fig8.update_layout(**base_layout(300, "Seasonality Structural Distribution Matrices"), showlegend=False)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig8, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Fig 4: Intraday Dispersion Bounds
+    fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(255,204,0,0.06)", line=dict(color=ACCENT, width=1.0)))
+    fig4.update_layout(**base_layout(240, "Intraday Dispersion Bounds (High - Low Variance)"))
 
-    st.markdown('<p class="section-header">Cross-Sectional Attribute Correlation Matrix Heatmap</p>', unsafe_allow_html=True)
+    # Fig 5: Momentum Convergence/Divergence Oscillator (MACD)
+    fig5 = None
+    if dv["MACD"].notna().any():
+        fig5 = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.6, 0.4], vertical_spacing=0.05)
+        fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACD"], name="MACD Vector", line=dict(color=BLUE, width=1.2)), row=1, col=1)
+        fig5.add_trace(go.Scatter(x=dv.index, y=dv["MACDSig"], name="MACD Signal", line=dict(color=ACCENT, width=1.2)), row=1, col=1)
+        h_colors = [GREEN if val >= 0 else RED for val in dv["MACDHist"].fillna(0)]
+        fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram Matrix", marker_color=h_colors), row=2, col=1)
+        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=240, margin=dict(l=40,r=20,t=30,b=20), title=dict(text="Momentum Convergence (12, 26, 9)", font=dict(size=11, color=MUTED, family="Space Grotesk")), showlegend=False)
+        fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
+
+    # Fig 6: RSI Engine
+    fig6 = None
+    if dv["RSI"].notna().any():
+        fig6 = go.Figure()
+        fig6.add_trace(go.Scatter(x=dv.index, y=dv["RSI"], name="RSI Engine", line=dict(color=PURPLE, width=1.2)))
+        fig6.add_hrect(y0=70, y1=100, fillcolor="rgba(244,63,94,0.03)", line_width=0)
+        fig6.add_hrect(y0=0,  y1=30,  fillcolor="rgba(16,185,129,0.03)", line_width=0)
+        fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
+        fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
+        fig6.update_layout(**base_layout(240, "Relative Strength Velocity Zone RSI (14)", override_yaxis=dict(range=[0, 100])))
+
+    # Fig 7: Macro Annualized Core Price Assets
+    yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
+    fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
+    fig7.update_layout(**base_layout(240, "Macro Annualized Core Price Assets"))
+
+    # Fig 8: Seasonality Distribution
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    fig8 = go.Figure()
+    for m_idx, m_name in enumerate(months, 1):
+        sub = dv[dv.index.month == m_idx]["Close"].dropna()
+        if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(59,130,246,0.12)"))
+    fig8.update_layout(**base_layout(240, "Seasonality Structural Distribution Matrices"), showlegend=False)
+
+    # Fig 11: Correlation matrix
+    fig11 = None
     corr_cols = [c for c in ["Open", "High", "Low", "Close", "Volume", "Spread"] if c in dv.columns]
     corr_data = dv[corr_cols].dropna()
-    
     if len(corr_data) >= 5 and len(corr_cols) >= 2:
         c_mat = corr_data.corr().round(3)
         fig11 = go.Figure(go.Heatmap(z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1, text=c_mat.values, texttemplate="%{text:.2f}", showscale=True))
-        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=360, margin=dict(l=40, r=20, t=10, b=40))
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
+        fig11.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(12,16,28,0.40)", font_color=FONT_COL, height=240, margin=dict(l=40, r=20, t=10, b=40))
+
+    # Output the dynamic horizontal scroll sequence frame (Flying Posters - reactbits)
+    st.markdown('<div class="flying-posters-viewport">', unsafe_allow_html=True)
+
+    # Poster 1
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig1, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 2
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig2, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 3
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig3, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 4
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig4, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 5
+    if fig5 is not None:
+        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+        st.plotly_chart(fig5, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 6
+    if fig6 is not None:
+        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+        st.plotly_chart(fig6, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 7
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig7, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 8
+    st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
+    st.plotly_chart(fig8, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Poster 9
+    if fig11 is not None:
+        st.markdown('<div class="flying-poster-card">', unsafe_allow_html=True)
         st.plotly_chart(fig11, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        empty_state("📊", "Attribute matrices lack sufficient spatial alignment dimensions.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  TAB 4 — REACTBITS SHOWROOM (DEPRECATED — INTEGRATED DIRECTLY INTO CORES)

@@ -278,13 +278,14 @@ def load_model_cached(file_id: str):
 
 def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd.Timestamp, n_days: int) -> tuple:
     """
-    Advanced multi-step tracking engine.
-    Ensures 100% confidence limits for historical database selections, 
-    and bridges missing visual gaps through sequential recursive loops.
+    Robust Multi-Step Tracking Simulation Engine.
+    Handles user target points inside historical data with 100% confidence parameters,
+    and dynamically bridges gaps to eliminate visualization errors.
     """
     db_max_date = df.index.max()
     target_start = pd.Timestamp(start_date)
     
+    # Generate user-requested forecast horizons safely
     biz_dates = pd.bdate_range(start=target_start, periods=n_days)
     recent_ret = df["DailyReturn"].replace([np.inf, -np.inf], np.nan).dropna().tail(60)
     daily_vol = (recent_ret.std() / 100) if len(recent_ret) >= 5 else 0.02
@@ -292,53 +293,40 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
     preds_prices, lower_bounds, upper_bounds = [], [], []
     bridge_dates, bridge_prices, bridge_lo, bridge_hi = [], [], [], []
     
-    # ── CASE 1: Forecast starts inside historical range ──
+    # ── CASE 1: Start point belongs to available historical data records ──
     if target_start <= db_max_date:
-        sim_dates = pd.bdate_range(start=target_start, end=biz_dates[-1])
-        
-        # Safe lookup for history slice fallback
-        lookback_df = df[df.index < target_start]
-        if lookback_df.empty:
-            lookback_df = df.head(LOOKBACK)
-        history_slice = lookback_df.tail(LOOKBACK)
-        scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
-        
-        sim_cache = {}
-        forecast_step_counter = 1
-        
-        for curr_date in sim_dates:
+        # Step A: Loop over each specific date in the requested target horizon window
+        for idx, curr_date in enumerate(biz_dates):
             if curr_date <= db_max_date:
-                # If date exists in database, plot actual data with 100% confidence (bounds equal actual value)
+                # If data point exists in database, supply actual records with 100% confidence bands (Hi == Lo == Close)
                 actual_val = float(df.loc[curr_date, "Adj Close"])
-                sim_cache[curr_date] = (actual_val, actual_val, actual_val)
-                scaled_seed.append(float(scaler.transform([[actual_val]])[0,0]))
+                preds_prices.append(actual_val)
+                lower_bounds.append(actual_val)
+                upper_bounds.append(actual_val)
             else:
-                # Project forward out of database boundaries via recursive neural networks
+                # If target window rolls past the database edge, initialize recursive projection safely
+                lookback_slice = df[df.index < curr_date].tail(LOOKBACK)
+                scaled_seed = list(scaler.transform(lookback_slice[["Adj Close"]].values).flatten())
+                
+                # Dynamic append of any previously derived out-of-bounds metrics in loop
+                ext_steps = int((curr_date - db_max_date).days)
+                for step_idx in range(max(1, idx)):
+                    if biz_dates[step_idx] > db_max_date and biz_dates[step_idx] < curr_date:
+                        scaled_val = scaler.transform([[preds_prices[step_idx]]])[0, 0]
+                        scaled_seed.append(scaled_val)
+                        
                 x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
                 out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
                 pred_val = float(scaler.inverse_transform([[out_scaled]])[0,0])
-                scaled_seed.append(out_scaled)
                 
-                band_frac = np.clip(daily_vol * np.sqrt(forecast_step_counter), 0, 0.5)
-                sim_cache[curr_date] = (pred_val, pred_val * (1 - band_frac), pred_val * (1 + band_frac))
-                forecast_step_counter += 1
+                band_frac = np.clip(daily_vol * np.sqrt(max(1, ext_steps)), 0, 0.5)
+                preds_prices.append(pred_val)
+                lower_bounds.append(pred_val * (1 - band_frac))
+                upper_bounds.append(pred_val * (1 + band_frac))
                 
-        for d in biz_dates:
-            if d in sim_cache:
-                p, lo, hi = sim_cache[d]
-            else:
-                # Fallback safeguard
-                last_cached_val = float(df["Adj Close"].iloc[-1])
-                p, lo, hi = last_cached_val, last_cached_val, last_cached_val
-            preds_prices.append(p)
-            lower_bounds.append(lo)
-            upper_bounds.append(hi)
-            
-    # ── CASE 2: Forecast starts in the future (Generate Implicit Bridge) ──
+    # ── CASE 2: Start point sits in future timeline (Requires Visual Continuity Bridge) ──
     else:
-        # Step A: Build continuous tracking bridge through the missing timeline gap
         gap_range = pd.bdate_range(start=db_max_date + pd.Timedelta(days=1), end=target_start - pd.Timedelta(days=1))
-        
         history_slice = df.tail(LOOKBACK)
         scaled_seed = list(scaler.transform(history_slice[["Adj Close"]].values).flatten())
         
@@ -356,7 +344,6 @@ def dynamic_timeline_forecasting(model, scaler, df: pd.DataFrame, start_date: pd
             bridge_hi.append(pred_val * (1 + band_frac))
             bridge_step += 1
             
-        # Step B: Generate user's target window forecast from scaled queue position
         for step in range(1, n_days + 1):
             x = np.array(scaled_seed[-LOOKBACK:], dtype=np.float32).reshape(1, LOOKBACK, 1)
             out_scaled = np.clip(float(model.predict(x, verbose=0)[0, 0]), 0.0, 1.0)
@@ -413,7 +400,7 @@ with st.sidebar:
         "Model Resource Node", value=secret_url, type="password",
         help="Pre-loaded securely via secrets file."
     )
-    load_btn = st.button("⬇ Load Model Core", use_container_width=True, type="primary")
+    load_btn = st.button("⬇ Load Model Core", width="stretch", type="primary")
 
     model_status_slot = st.empty()
     if st.session_state.get("model_loaded", False):
@@ -500,7 +487,7 @@ tab1, tab2, tab3 = st.tabs(["📡  Trade Signals", "🔮  Forecast Engine", "�
 
 
 # ════════════════════════════════════════════════════════════
-#  TAB 1 — TRADE SIGNALS (RESTORED CURVES & THRESHOLDS)
+#  TAB 1 — TRADE SIGNALS (RESTORED LIMITS & LAYOUT CORES)
 # ════════════════════════════════════════════════════════════
 with tab1:
     rsi_now  = safe_float(df["RSI"].dropna().iloc[-1] if df["RSI"].dropna().any() else np.nan)
@@ -549,7 +536,7 @@ with tab1:
         c2.markdown(metric_card("Stop Loss Threshold", f"${stop_loss:.2f}", f"−{risk_pct}%", "metric-delta-down"), unsafe_allow_html=True)
         c3.markdown(metric_card("Take Target (1:2)", f"${take_profit:.2f}", f"+{risk_pct*2}%", "metric-delta-up"), unsafe_allow_html=True)
         
-        # RESTORED: Added full mathematical overlay layers (MAs & BBs) back into trade signal visualizer
+        # RESTORED: Technical overlay layers (MAs & BBs) back into trade signal visualizer
         fig_t = go.Figure()
         ctx_df = df.tail(90)
         fig_t.add_trace(go.Scatter(x=ctx_df.index, y=ctx_df["Close"], name="Close Core", line=dict(color=ACCENT, width=2)))
@@ -557,13 +544,13 @@ with tab1:
         fig_t.add_trace(go.Scatter(x=ctx_df.index, y=ctx_df["BB_Upper"], name="BB Upper Band", line=dict(color=MUTED, width=0.8, dash="dot")))
         fig_t.add_trace(go.Scatter(x=ctx_df.index, y=ctx_df["BB_Lower"], name="BB Lower Band", line=dict(color=MUTED, width=0.8, dash="dot"), fill="tonexty", fillcolor="rgba(122,128,153,0.03)"))
         
-        # RESTORED: Horizontal Execution Dotted Limits Lines
-        fig_t.add_hline(y=eff_entry, line_color=ACCENT, line_width=1.2, line_dash="solid", annotation_text="Calculated Entry Target")
-        fig_t.add_hline(y=take_profit, line_color=GREEN, line_width=1.2, line_dash="dash", annotation_text="Take Profit Threshold (1:2)")
-        fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line")
+        # RESTORED CRITICAL FIX: Horizontal Line Indicators for Threshold Risk Matrix tracking
+        fig_t.add_hline(y=eff_entry, line_color=ACCENT, line_width=1.2, line_dash="solid", annotation_text="Calculated Entry Target", annotation_position="top left")
+        fig_t.add_hline(y=take_profit, line_color=GREEN, line_width=1.2, line_dash="dash", annotation_text="Take Profit Threshold (1:2)", annotation_position="top left")
+        fig_t.add_hline(y=stop_loss, line_color=RED, line_width=1.2, line_dash="dash", annotation_text="Risk Stop Loss Line", annotation_position="bottom left")
 
         fig_t.update_layout(**base_layout(290, "Trailing Trend Baseline Metrics Context Overlay", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig_t, use_container_width=True)
+        st.plotly_chart(fig_t, width="stretch")
 
 
 # ════════════════════════════════════════════════════════════
@@ -604,7 +591,7 @@ with tab2:
         fig_fc.add_trace(go.Scatter(x=f_dates, y=f_prices, name="Target Horizon Output", line=dict(color=BLUE, width=2.2, dash="dot"), mode="lines+markers"))
         
         fig_fc.update_layout(**base_layout(440, "Dynamic Continuity Multi-Step Simulation Chart Core", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig_fc, use_container_width=True)
+        st.plotly_chart(fig_fc, width="stretch")
 
 
 # ════════════════════════════════════════════════════════════
@@ -670,12 +657,12 @@ with tab3:
             if c in dv.columns and dv[c].notna().any():
                 fig1.add_trace(go.Scatter(x=dv.index, y=dv[c], name=c, line=dict(color=col_color, width=1, dash="dot")))
         fig1.update_layout(**base_layout(340, "Continuous Close Pricing & Trailing Moving Averages", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width="stretch")
     with r1b:
         v_cols = [GREEN if i==0 else (GREEN if dv["Close"].iloc[i]>=dv["Close"].iloc[i-1] else RED) for i in range(len(dv))]
         fig2 = go.Figure(go.Bar(x=dv.index, y=dv["Volume"], marker_color=v_cols, name="Volume Node"))
         fig2.update_layout(**base_layout(340, "Unified Timeline Volume Distribution Matrix"))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
     # Row 2: Structural Candlesticks + Intraday Risk Spread Dispersion
     r2a, r2b = st.columns([3, 2])
@@ -686,11 +673,11 @@ with tab3:
             fig3.add_trace(go.Scatter(x=dv.index, y=dv["BB_Lower"], fill="tonexty", fillcolor="rgba(122,128,153,0.04)", name="Volatility Floor", line=dict(color=MUTED, width=0.8, dash="dash")))
         fig3.update_layout(**base_layout(340, "High-Frequency Structural Candlestick + Variance Channels", override_yaxis=dict(tickprefix="$")))
         fig3.update_layout(xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width="stretch")
     with r2b:
         fig4 = go.Figure(go.Scatter(x=dv.index, y=dv["Spread"], fill="tozeroy", fillcolor="rgba(232,200,74,0.12)", line=dict(color=ACCENT, width=1.2)))
         fig4.update_layout(**base_layout(340, "Intraday Risk Dispersion (High − Low Volatility Variance)", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width="stretch")
 
     # RESTORED Row 3: Missing Technical Oscillators Panel (MACD & RSI Matrices)
     r3a, r3b = st.columns(2)
@@ -703,7 +690,7 @@ with tab3:
             fig5.add_trace(go.Bar(x=dv.index, y=dv["MACDHist"], name="Histogram", marker_color=h_colors), row=2, col=1)
             fig5.update_layout(paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL, height=340, margin=dict(l=0,r=0,t=30,b=0), title=dict(text="Momentum MACD Oscillator Structure (12, 26, 9)", font=dict(size=12, color=MUTED)), showlegend=False)
             fig5.update_xaxes(gridcolor=GRID_COL); fig5.update_yaxes(gridcolor=GRID_COL)
-            st.plotly_chart(fig5, use_container_width=True)
+            st.plotly_chart(fig5, width="stretch")
         else: empty_state("📉", "MACD sequence arrays initializing...")
     with r3b:
         if dv["RSI"].notna().any():
@@ -714,7 +701,7 @@ with tab3:
             fig6.add_hline(y=70, line_color=RED, line_dash="dash", line_width=0.8)
             fig6.add_hline(y=30, line_color=GREEN, line_dash="dash", line_width=0.8)
             fig6.update_layout(**base_layout(340, "Relative Strength Velocity Index RSI (14)", override_yaxis=dict(range=[0, 100])))
-            st.plotly_chart(fig6, use_container_width=True)
+            st.plotly_chart(fig6, width="stretch")
         else: empty_state("📉", "Velocity arrays initializing...")
 
     # Row 4: Macro Allocation Bars + Seasonality Box Plots
@@ -723,7 +710,7 @@ with tab3:
         yearly = dv.groupby(dv.index.year)["Close"].mean().reset_index()
         fig7 = go.Figure(go.Bar(x=yearly.iloc[:, 0].astype(str), y=yearly["Close"], marker_color=ACCENT))
         fig7.update_layout(**base_layout(340, "Macro Annual Mean Close Allocation Values (Extended Horizon)", override_yaxis=dict(tickprefix="$")))
-        st.plotly_chart(fig7, use_container_width=True)
+        st.plotly_chart(fig7, width="stretch")
     with r4b:
         months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
         fig8 = go.Figure()
@@ -731,7 +718,7 @@ with tab3:
             sub = dv[dv.index.month == m_idx]["Close"].dropna()
             if not sub.empty: fig8.add_trace(go.Box(y=sub, name=m_name, marker_color=BLUE, line_color=BLUE, fillcolor="rgba(91,141,238,0.18)"))
         fig8.update_layout(**base_layout(340, "Seasonality Structural Distribution Matrices"), showlegend=False)
-        st.plotly_chart(fig8, use_container_width=True)
+        st.plotly_chart(fig8, width="stretch")
 
     # RESTORED Row 5: Missing Cross-Sectional Heatmap Matrix Matrix
     st.markdown('<p class="section-header">Cross-Sectional Attribute Correlation Matrix Heatmap</p>', unsafe_allow_html=True)
@@ -742,6 +729,6 @@ with tab3:
         c_mat = corr_data.corr().round(3)
         fig11 = go.Figure(go.Heatmap(z=c_mat.values, x=corr_cols, y=corr_cols, colorscale="RdBu", zmid=0, zmin=-1, zmax=1, text=c_mat.values, texttemplate="%{text:.2f}", showscale=True))
         fig11.update_layout(paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL, height=360, margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig11, use_container_width=True)
+        st.plotly_chart(fig11, width="stretch")
     else:
         empty_state("📊", "Attribute matrices lack sufficient spatial alignment dimensions.")

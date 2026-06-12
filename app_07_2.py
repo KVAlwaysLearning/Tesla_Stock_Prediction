@@ -57,41 +57,50 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Ghost Cursor Engine (ReactBits Layout Compatible) ──────────────────────
+# ── Global Ghost Cursor Engine (Streamlit Sandboxed Sandbox Breakout) ───
 st.markdown("""
 <div id="rb-ghost-cursor-container" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:999999; overflow:hidden;">
-    <canvas id="rb-ghost-cursor-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
+    <canvas id="rb-ghost-cursor-canvas" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none;"></canvas>
 </div>
 
 <script>
 (function() {
-    /* Prevent duplicate engine attachments if continuous reruns occur */
-    if (window.hasOwnProperty('__RB_GHOST_CURSOR_ACTIVE__')) { return; }
-    window.__RB_GHOST_CURSOR_ACTIVE__ = true;
+    /* Determine target context: Break out of Streamlit sandboxed frame to the master view */
+    var targetWindow = window.parent || window;
+    var targetDocument = targetWindow.document;
 
+    if (targetWindow.hasOwnProperty('__RB_GHOST_CURSOR_ACTIVE__')) { return; }
+    targetWindow.__RB_GHOST_CURSOR_ACTIVE__ = true;
+
+    /* Append or target canvas inside the true parent viewport layer */
     var canvas = document.getElementById('rb-ghost-cursor-canvas');
     if (!canvas) { return; }
-    var ctx = canvas.getContext('2d');
+    
+    /* Move canvas container directly into the parent document body so it layers on top of everything */
+    var container = document.getElementById('rb-ghost-cursor-container');
+    if (container && targetDocument.body) {
+        targetDocument.body.appendChild(container);
+    }
 
+    var ctx = canvas.getContext('2d');
     var points = [];
-    var maxPoints = 20; 
+    var maxPoints = 25; 
     var cursor = { x: -100, y: -100 };
 
     function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        canvas.width = targetWindow.innerWidth;
+        canvas.height = targetWindow.innerHeight;
     }
-    window.addEventListener('resize', resizeCanvas);
+    targetWindow.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    /* Global viewport mouse tracker */
-    window.addEventListener('mousemove', function(e) {
+    /* Track across the absolute layout boundary window context */
+    targetWindow.addEventListener('mousemove', function(e) {
         cursor.x = e.clientX;
         cursor.y = e.clientY;
     });
 
-    /* Touch screen compatibility */
-    window.addEventListener('touchmove', function(e) {
+    targetWindow.addEventListener('touchmove', function(e) {
         if (e.touches.length > 0) {
             cursor.x = e.touches[0].clientX;
             cursor.y = e.touches[0].clientY;
@@ -116,24 +125,26 @@ st.markdown("""
                 ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
             }
 
-            ctx.strokeStyle = 'rgba(255, 204, 0, 0.75)'; 
-            ctx.lineWidth = 3;
+            /* Neon Electric Gold primary trail */
+            ctx.strokeStyle = 'rgba(255, 204, 0, 0.85)'; 
+            ctx.lineWidth = 3.5;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 14;
             ctx.shadowColor = '#ffcc00';
             ctx.stroke();
 
+            /* Auxiliary Matrix Core particles */
             for (var j = 0; j < points.length; j++) {
                 var ratio = j / points.length;
                 ctx.beginPath();
-                ctx.arc(points[j].x, points[j].y, ratio * 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(59, 130, 246, ' + (ratio * 0.4) + ')'; 
+                ctx.arc(points[j].x, points[j].y, ratio * 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(59, 130, 246, ' + (ratio * 0.5) + ')'; 
                 ctx.shadowBlur = 0;
                 ctx.fill();
             }
         }
-        requestAnimationFrame(animate);
+        targetWindow.requestAnimationFrame(animate);
     }
     animate();
 })();

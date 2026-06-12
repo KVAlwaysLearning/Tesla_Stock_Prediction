@@ -2364,64 +2364,96 @@ with tab3:
     st.markdown('''
         <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
             <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
-                🛰️ CONTINUOUS CLOSE PRICING SEQUENCE
+                📈 CONTINUOUS CLOSE PRICING SEQUENCE
             </div>
     ''', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 2
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">📊 SEGMENTED BAR VOLUME DISTRIBUTION</div>', unsafe_allow_html=True)
+    # Poster 2: Segmented Bar Volume Distribution
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                📊 SEGMENTED BAR VOLUME DISTRIBUTION
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig2, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 3
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">🕯️ HOLOGRAPHIC CANDLESTICK ENVELOPE</div>', unsafe_allow_html=True)
+    # Poster 3: Holographic Candlestick Envelope
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                🕯️ HOLOGRAPHIC CANDLESTICK ENVELOPE
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig3, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 4
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">📈 INTRADAY DISPERSION BOUNDS VARIANCE</div>', unsafe_allow_html=True)
+    # Poster 4: Intraday Dispersion Bounds Variance
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                📈 INTRADAY DISPERSION BOUNDS VARIANCE
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig4, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 5
+    # Poster 5: Momentum Convergence Contour
     if fig5 is not None:
-        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-        st.markdown('<div class="rb-graph-title-btn">📉 MOMENTUM CONVERGENCE CONTOUR</div>', unsafe_allow_html=True)
+        st.markdown('''
+            <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                    📉 MOMENTUM CONVERGENCE CONTOUR
+                </div>
+        ''', unsafe_allow_html=True)
         st.plotly_chart(fig5, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 6
+    # Poster 6: Strength Velocity RSI Oscillator
     if fig6 is not None:
-        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-        st.markdown('<div class="rb-graph-title-btn">📶 STRENGTH VELOCITY RSI OSCILLATOR</div>', unsafe_allow_html=True)
+        st.markdown('''
+            <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                    📶 STRENGTH VELOCITY RSI OSCILLATOR
+                </div>
+        ''', unsafe_allow_html=True)
         st.plotly_chart(fig6, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 7
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">📅 MACRO ANNUALIZED PRICE ASSETS</div>', unsafe_allow_html=True)
+    # Poster 7: Macro Annualized Price Assets
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                📅 MACRO ANNUALIZED PRICE ASSETS
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig7, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 8
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">❄️ SEASONALITY DISTRIBUTION MATRICES</div>', unsafe_allow_html=True)
+    # Poster 8: Seasonality Distribution Matrices
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                ❄️ SEASONALITY DISTRIBUTION MATRICES
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig8, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Poster 9
+    # Poster 9: Attribute Correlation Matrix
     if fig11 is not None:
-        st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-        st.markdown('<div class="rb-graph-title-btn">🧬 ATTRIBUTE CORRELATION MATRIX</div>', unsafe_allow_html=True)
+        st.markdown('''
+            <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                    🧬 ATTRIBUTE CORRELATION MATRIX
+                </div>
+        ''', unsafe_allow_html=True)
         st.plotly_chart(fig11, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True) # End of viewport container
 
 # ════════════════════════════════════════════════════════════
 #  TAB 4 — REACTBITS SHOWROOM (DEPRECATED — INTEGRATED DIRECTLY INTO CORES)

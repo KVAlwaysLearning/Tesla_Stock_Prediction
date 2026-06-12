@@ -1246,7 +1246,7 @@ def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metri
     val_inner = f'<span class="rb-shinytext">{value}</span>' if show_scramble else f'<span class="rb-blurtext" style="color: #ffffff;">{value}</span>'
     
     # SpotlightCard (Component 12) + BounceCard (Component 16) + Noise Overlay (Component 3) + TechCardDecorator (Component 15) + BlurText (Component 8):
-    return f"""
+    html_content = f"""
     <div class="metric-card rb-spotlightcard rb-bounce-card" style="position: relative; overflow: visible; padding: 18px 16px !important; min-height: 110px; background: #0c101c !important;">
         {decorator}
         <div class="rb-noise-bg" style="padding: 0; min-height: 0;">
@@ -1256,6 +1256,7 @@ def metric_card(label: str, value: str, delta: str = "", delta_cls: str = "metri
         </div>
     </div>
     """
+    return clean_html(html_content)
 
 def base_layout(height: int = 350, title: str = "", override_yaxis=None) -> dict:
     layout = dict(
@@ -1927,9 +1928,9 @@ with tab1:
             </div>
         </div>
         """
-        st.markdown(star_border_html, unsafe_allow_html=True)
+        st.markdown(clean_html(star_border_html), unsafe_allow_html=True)
         
-        st.markdown('<p class="section-header" style="margin-top: 24px;"><span class="rb-gradienttext">Consensus Matrix Details</span></p>', unsafe_allow_html=True)
+        st.markdown(clean_html('<p class="section-header" style="margin-top: 24px;"><span class="rb-gradienttext">Consensus Matrix Details</span></p>'), unsafe_allow_html=True)
         
         # Style list of technical factor scores using TrueFocus (Component 11) focus filters
         single_items_html = ""
@@ -1983,7 +1984,7 @@ with tab1:
             </div>
         </div>
         """
-        st.markdown(indicator_details_html, unsafe_allow_html=True)
+        st.markdown(clean_html(indicator_details_html), unsafe_allow_html=True)
 
         # Component 26: DiagnosticConsole Green CRT terminal displaying real calculations logs
         console_logs = f"""

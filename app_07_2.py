@@ -2360,9 +2360,13 @@ with tab3:
     # Output the dynamic horizontal scroll sequence frame (Flying Posters - reactbits)
     st.markdown('<div class="flying-posters-viewport">', unsafe_allow_html=True)
 
-    # Poster 1
-    st.markdown('<div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">', unsafe_allow_html=True)
-    st.markdown('<div class="rb-graph-title-btn">🛰️ CONTINUOUS CLOSE PRICING SEQUENCE</div>', unsafe_allow_html=True)
+    # Poster 1: Continuous Close Pricing Sequence
+    st.markdown('''
+        <div class="flying-poster-card" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffcc00; letter-spacing: 0.08em; margin: 14px 0 6px 0; text-transform: uppercase;">
+                🛰️ CONTINUOUS CLOSE PRICING SEQUENCE
+            </div>
+    ''', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 

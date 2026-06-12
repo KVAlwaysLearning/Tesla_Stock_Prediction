@@ -2,17 +2,18 @@
   # TSLA FORECASTING HUB  |  app.py
   # Model: CNN-GRU + Hurst Regime Detection + OU Mean-Reversion
   # ============================================================
+import os
+import re
+import warnings
+import tempfile
 
-  import os
-  import re
-  import warnings
-  import tempfile
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import streamlit as st
 
-  import numpy as np
-  import pandas as pd
-  import plotly.graph_objects as go
-  from plotly.subplots import make_subplots
-  import streamlit as st
+if 1:
 
   def clean_html(html_code: str) -> str:
       """Compacts HTML code into a safe format, completely preventing Streamlit's 

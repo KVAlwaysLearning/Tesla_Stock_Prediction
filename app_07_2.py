@@ -57,6 +57,94 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Ghost Cursor Engine (ReactBits Inspired) ──────────────────────
+st.markdown("""
+<div id="rb-ghost-cursor-container" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:999999; overflow:hidden;">
+    <canvas id="rb-ghost-cursor-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
+</div>
+
+<script>
+(function() {
+    // Prevent duplicate engine attachments if rerun occurs
+    if (window.hasOwnProperty('__RB_GHOST_CURSOR_ACTIVE__')) return;
+    window.__RB_GHOST_CURSOR_ACTIVE__ = true;
+
+    const canvas = document.getElementById('rb-ghost-cursor-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    let points = [];
+    const maxPoints = 20; // Length of the trail
+    const cursor = { x: -100, y: -100 };
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Track real cursor across the global window viewport
+    window.addEventListener('mousemove', (e) => {
+        cursor.x = e.clientX;
+        cursor.y = e.clientY;
+    });
+
+    // Support touch devices gracefully
+    window.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+            cursor.x = e.touches[0].clientX;
+            cursor.y = e.touches[0].clientY;
+        }
+    });
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Append current cursor location coordinates
+        points.push({ x: cursor.x, y: cursor.y });
+        if (points.length > maxPoints) {
+            points.shift();
+        }
+
+        if (points.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+
+            // Compute quadratic bezier curves for fluid ghost tail transitions
+            for (let i = 1; i < points.length - 1; i++) {
+                const xc = (points[i].x + points[i + 1].x) / 2;
+                const yc = (points[i].y + points[i + 1].y) / 2;
+                ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+            }
+
+            // High-tech neon glow style variables matching the TSLA core theme
+            ctx.strokeStyle = 'rgba(255, 204, 0, 0.75)'; // Electric Gold
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#ffcc00';
+            ctx.stroke();
+
+            // Render auxiliary fading secondary ghost particles
+            for (let i = 0; i < points.length; i++) {
+                const ratio = i / points.length;
+                ctx.beginPath();
+                ctx.arc(points[i].x, points[i].y, ratio * 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(59, 130, 246, ${ratio * 0.4})`; // Tech Blue Core
+                ctx.shadowBlur = 0;
+                ctx.fill();
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+""", unsafe_allow_html=True)
+
+
 # ── Futuristic Theme — ReactBits-inspired animations ─────────
 st.markdown("""
 <style>

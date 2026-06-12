@@ -57,93 +57,188 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global Ghost Cursor Engine (Streamlit Sandboxed Sandbox Breakout) ───
+# ── WebGL Ghost Cursor Engine (ReactBits Port to Streamlit) ───
 st.markdown("""
-<div id="rb-ghost-cursor-container" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:999999; overflow:hidden;">
-    <canvas id="rb-ghost-cursor-canvas" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none;"></canvas>
+<div id="rb-webgl-ghost-cursor-container" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:999999; overflow:hidden;">
+    <canvas id="rb-webgl-ghost-cursor-canvas" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; display:block; mix-blend-mode:screen;"></canvas>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
 (function() {
-    /* Determine target context: Break out of Streamlit sandboxed frame to the master view */
     var targetWindow = window.parent || window;
     var targetDocument = targetWindow.document;
 
-    if (targetWindow.hasOwnProperty('__RB_GHOST_CURSOR_ACTIVE__')) { return; }
-    targetWindow.__RB_GHOST_CURSOR_ACTIVE__ = true;
+    if (targetWindow.hasOwnProperty('__RB_WEBGL_CURSOR_ACTIVE__')) { return; }
+    targetWindow.__RB_WEBGL_CURSOR_ACTIVE__ = true;
 
-    /* Append or target canvas inside the true parent viewport layer */
-    var canvas = document.getElementById('rb-ghost-cursor-canvas');
-    if (!canvas) { return; }
-    
-    /* Move canvas container directly into the parent document body so it layers on top of everything */
-    var container = document.getElementById('rb-ghost-cursor-container');
+    var container = document.getElementById('rb-webgl-ghost-cursor-container');
+    var canvas = document.getElementById('rb-webgl-ghost-cursor-canvas');
+    if (!canvas || !window.THREE) { return; }
+
+    /* Teleport canvas container layout directly into parent document root view */
     if (container && targetDocument.body) {
         targetDocument.body.appendChild(container);
     }
 
-    var ctx = canvas.getContext('2d');
-    var points = [];
-    var maxPoints = 25; 
-    var cursor = { x: -100, y: -100 };
+    var renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: true,
+        alpha: true,
+        depth: false,
+        stencil: false,
+        premultipliedAlpha: false
+    });
+    renderer.setClearColor(0x000000, 0);
 
-    function resizeCanvas() {
-        canvas.width = targetWindow.innerWidth;
-        canvas.height = targetWindow.innerHeight;
+    var scene = new THREE.Scene();
+    var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    var geom = new THREE.PlaneGeometry(2, 2);
+
+    /* Props configuration matched with your React template layout values */
+    var trailLength = 50;
+    var inertia = 0.5;
+    var brightness = 2.0;
+    var rawColor = '#B497CF';
+    
+    var trailBuf = Array.from({ length: trailLength }, function() { return new THREE.Vector2(0.5, 0.5); });
+    var head = 0;
+    var currentMouse = new THREE.Vector2(0.5, 0.5);
+    var velocity = new THREE.Vector2(0, 0);
+    var fadeOpacity = 1.0;
+    var lastMoveTime = performance.now();
+    var pointerActive = false;
+
+    var baseColor = new THREE.Color(rawColor);
+
+    /* Fragment Shader Port converting ThreeJS GLSL parameters perfectly */
+    var fragmentShaderCode = [
+        "uniform float iTime;",
+        "uniform vec3  iResolution;",
+        "uniform vec2  iMouse;",
+        "uniform vec2  iPrevMouse[" + trailLength + "];",
+        "uniform float iOpacity;",
+        "uniform float iScale;",
+        "uniform vec3  iBaseColor;",
+        "uniform float iBrightness;",
+        "varying vec2  vUv;",
+
+        "float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7))) * 43758.5453123); }",
+        "float noise(vec2 p){",
+        "  vec2 i = floor(p), f = fract(p);",
+        "  f *= f * (3. - 2. * f);",
+        "  return mix(mix(hash(i + vec2(0.,0.)), hash(i + vec2(1.,0.)), f.x),",
+        "             mix(hash(i + vec2(0.,1.)), hash(i + vec2(1.,1.)), f.x), f.y);",
+        "}",
+        "float fbm(vec2 p){",
+        "  float v = 0.0; float a = 0.5; mat2 m = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));",
+        "  for(int i=0;i<5;i++){ v += a * noise(p); p = m * p * 2.0; a *= 0.5; }",
+        "  return v;",
+        "}",
+
+        "vec4 blob(vec2 p, vec2 mousePos, float intensity, float activity) {",
+        "  vec2 q = vec2(fbm(p * iScale + iTime * 0.1), fbm(p * iScale + vec2(5.2,1.3) + iTime * 0.1));",
+        "  vec2 r = vec2(fbm(p * iScale + q * 1.5 + iTime * 0.15), fbm(p * iScale + q * 1.5 + vec2(8.3,2.8) + iTime * 0.15));",
+        "  float smoke = fbm(p * iScale + r * 0.8);",
+        "  float radius = 0.5 + 0.3 * (1.0 / iScale);",
+        "  float distFactor = 1.0 - smoothstep(0.0, radius * activity, length(p - mousePos));",
+        "  float alpha = pow(smoke, 2.5) * distFactor;",
+        "  vec3 color = mix(mix(iBaseColor, vec3(1.0), 0.15), mix(iBaseColor, vec3(0.8, 0.9, 1.0), 0.25), sin(iTime * 0.5) * 0.5 + 0.5);",
+        "  return vec4(color * alpha * intensity, alpha * intensity);",
+        "}",
+
+        "void main() {",
+        "  vec2 uv = (gl_FragCoord.xy / iResolution.xy * 2.0 - 1.0) * vec2(iResolution.x / iResolution.y, 1.0);",
+        "  vec2 mouse = (iMouse * 2.0 - 1.0) * vec2(iResolution.x / iResolution.y, 1.0);",
+        "  vec3 colorAcc = vec3(0.0); float alphaAcc = 0.0;",
+        "  vec4 b = blob(uv, mouse, 1.0, iOpacity); colorAcc += b.rgb; alphaAcc += b.a;",
+        "  for (int i = 0; i < " + trailLength + "; i++) {",
+        "    vec2 pm = (iPrevMouse[i] * 2.0 - 1.0) * vec2(iResolution.x / iResolution.y, 1.0);",
+        "    float t = 1.0 - float(i) / float(" + trailLength + "); t = pow(t, 2.0);",
+        "    if (t > 0.01) { vec4 bt = blob(uv, pm, t * 0.8, iOpacity); colorAcc += bt.rgb; alphaAcc += bt.a; }",
+        "  }",
+        "  colorAcc *= iBrightness;",
+        "  float outAlpha = clamp(alphaAcc * iOpacity, 0.0, 1.0);",
+        "  gl_FragColor = vec4(colorAcc, outAlpha);",
+        "}"
+    ].join("\n");
+
+    var material = new THREE.ShaderMaterial({
+        uniforms: {
+            iTime: { value: 0 },
+            iResolution: { value: new THREE.Vector3(1, 1, 1) },
+            iMouse: { value: new THREE.Vector2(0.5, 0.5) },
+            iPrevMouse: { value: trailBuf.map(function(v) { return v.clone(); }) },
+            iOpacity: { value: 1.0 },
+            iScale: { value: 1.2 },
+            iBaseColor: { value: new THREE.Vector3(baseColor.r, baseColor.g, baseColor.b) },
+            iBrightness: { value: brightness }
+        },
+        vertexShader: [
+            "varying vec2 vUv;",
+            "void main() { vUv = uv; gl_Position = vec4(position, 1.0); }"
+        ].join("\n"),
+        fragmentShader: fragmentShaderCode,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+    });
+
+    var mesh = new THREE.Mesh(geom, material);
+    scene.add(mesh);
+
+    function resize() {
+        var w = targetWindow.innerWidth;
+        var h = targetWindow.innerHeight;
+        var dpr = Math.min(targetWindow.devicePixelRatio || 1, 1.5);
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(w, h, false);
+        material.uniforms.iResolution.value.set(w * dpr, h * dpr, 1);
     }
-    targetWindow.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    targetWindow.addEventListener('resize', resize);
+    resize();
 
-    /* Track across the absolute layout boundary window context */
+    /* Sync Global Parent Frame Input Coordinates */
     targetWindow.addEventListener('mousemove', function(e) {
-        cursor.x = e.clientX;
-        cursor.y = e.clientY;
+        var w = targetWindow.innerWidth;
+        var h = targetWindow.innerHeight;
+        currentMouse.set(e.clientX / w, 1 - (e.clientY / h));
+        pointerActive = true;
+        lastMoveTime = performance.now();
     });
 
-    targetWindow.addEventListener('touchmove', function(e) {
-        if (e.touches.length > 0) {
-            cursor.x = e.touches[0].clientX;
-            cursor.y = e.touches[0].clientY;
-        }
-    });
-
+    var start = performance.now();
     function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var now = performance.now();
+        var t = (now - start) / 1000;
 
-        points.push({ x: cursor.x, y: cursor.y });
-        if (points.length > maxPoints) {
-            points.shift();
-        }
-
-        if (points.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-
-            for (var i = 1; i < points.length - 1; i++) {
-                var xc = (points[i].x + points[i + 1].x) / 2;
-                var yc = (points[i].y + points[i + 1].y) / 2;
-                ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
-            }
-
-            /* Neon Electric Gold primary trail */
-            ctx.strokeStyle = 'rgba(255, 204, 0, 0.85)'; 
-            ctx.lineWidth = 3.5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.shadowBlur = 14;
-            ctx.shadowColor = '#ffcc00';
-            ctx.stroke();
-
-            /* Auxiliary Matrix Core particles */
-            for (var j = 0; j < points.length; j++) {
-                var ratio = j / points.length;
-                ctx.beginPath();
-                ctx.arc(points[j].x, points[j].y, ratio * 3, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(59, 130, 246, ' + (ratio * 0.5) + ')'; 
-                ctx.shadowBlur = 0;
-                ctx.fill();
+        if (pointerActive) {
+            velocity.set(currentMouse.x - material.uniforms.iMouse.value.x, currentMouse.y - material.uniforms.iMouse.value.y);
+            material.uniforms.iMouse.value.copy(currentMouse);
+            fadeOpacity = 1.0;
+        } else {
+            velocity.multiplyScalar(inertia);
+            if (velocity.lengthSq() > 1e-6) { material.uniforms.iMouse.value.add(velocity); }
+            var dt = now - lastMoveTime;
+            if (dt > 1000) {
+                var k = Math.min(1, (dt - 1000) / 1500);
+                fadeOpacity = Math.max(0, 1 - k);
             }
         }
+
+        head = (head + 1) % trailLength;
+        trailBuf[head].copy(material.uniforms.iMouse.value);
+        var arr = material.uniforms.iPrevMouse.value;
+        for (var i = 0; i < trailLength; i++) {
+            var srcIdx = (head - i + trailLength) % trailLength;
+            arr[i].copy(trailBuf[srcIdx]);
+        }
+
+        material.uniforms.iOpacity.value = fadeOpacity;
+        material.uniforms.iTime.value = t;
+
+        renderer.render(scene, camera);
         targetWindow.requestAnimationFrame(animate);
     }
     animate();
